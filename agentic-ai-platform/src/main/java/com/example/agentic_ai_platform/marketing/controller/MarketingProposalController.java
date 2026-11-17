@@ -1,14 +1,25 @@
 package com.example.agentic_ai_platform.marketing.controller;
 
+import com.example.agentic_ai_platform.documents.entity.Document;
+import com.example.agentic_ai_platform.documents.entity.DocumentContent;
+import com.example.agentic_ai_platform.documents.repository.DocumentContentRepository;
+import com.example.agentic_ai_platform.documents.repository.DocumentRepository;
 import com.example.agentic_ai_platform.marketing.entity.MarketingProposal;
 import com.example.agentic_ai_platform.marketing.repository.MarketingProposalRepository;
 import com.example.agentic_ai_platform.marketing.serviceimpl.GroqContentGenerator;
+import org.apache.tika.Tika;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.security.MessageDigest;
 import java.time.*;
 import java.util.*;
 import org.slf4j.Logger;
@@ -30,6 +41,9 @@ public class MarketingProposalController {
     private final GroqContentGenerator groq;
     private final ObjectMapper json;
     private final JavaMailSender mail;
+    private final DocumentRepository documents;
+    private final DocumentContentRepository documentContents;
+    private final Tika tika = new Tika();
     private final String from;
     private final String mailHost;
 
@@ -38,12 +52,16 @@ public class MarketingProposalController {
             GroqContentGenerator groq,
             ObjectMapper json,
             JavaMailSender mail,
+            DocumentRepository documents,
+            DocumentContentRepository documentContents,
             @Value("${app.marketing.mail.from:verified-sender@example.com}") String from,
             @Value("${spring.mail.host:}") String mailHost) {
         this.proposals = proposals;
         this.groq = groq;
         this.json = json;
         this.mail = mail;
+        this.documents = documents;
+        this.documentContents = documentContents;
         this.from = from;
         this.mailHost = mailHost;
     }
@@ -204,6 +222,182 @@ public class MarketingProposalController {
         }
     }
 
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProposalView upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "clientCompany", required = false) String clientCompany,
+            @RequestParam(value = "contactName", required = false) String contactName,
+            @RequestParam(value = "contactEmail", required = false) String contactEmail,
+            @RequestParam(value = "industry", required = false) String industry,
+            @RequestParam(value = "useCase", required = false) String useCase,
+            @RequestParam(value = "budget", required = false) BigDecimal budget,
+            @RequestParam(value = "timeline", required = false) String timeline,
+            @RequestParam(value = "status", required = false, defaultValue = "ACTIVE") String status,
+            @RequestParam(value = "services", required = false) List<String> services,
+            JwtAuthenticationToken auth) {
+        if (file.isEmpty() || file.getSize() > 20L * 1024 * 1024) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or exceeds 20 MiB limit");
+        }
+        try {
+            UUID tenantId = tenant(auth);
+            byte[] bytes = file.getBytes();
+            String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            String rawFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "proposal-document";
+            String safeFilename = rawFilename.replaceAll("[\\\\/]", "_");
+
+            String detectedContentType = file.getContentType();
+            if (detectedContentType == null || detectedContentType.isBlank() || "application/octet-stream".equals(detectedContentType)) {
+                try { detectedContentType = tika.detect(bytes); } catch (Exception ignored) {}
+            }
+            if (detectedContentType == null || detectedContentType.isBlank()) {
+                detectedContentType = "application/pdf";
+            }
+
+            String extractedText = "";
+            try {
+                extractedText = tika.parseToString(new ByteArrayInputStream(bytes));
+                if (extractedText == null) extractedText = "";
+            } catch (Exception e) {
+                log.warn("Tika text extraction for proposal file failed: {}", e.getMessage());
+            }
+
+            // Store physical document
+            Document doc = documents.save(new Document(
+                    UUID.randomUUID(),
+                    tenantId,
+                    safeFilename,
+                    detectedContentType,
+                    file.getSize(),
+                    "PROPOSAL_DOCUMENT",
+                    "Direct Upload",
+                    auth.getToken().getClaimAsString("email") != null ? auth.getToken().getClaimAsString("email") : "system",
+                    hash,
+                    extractedText,
+                    Map.of(),
+                    Map.of(),
+                    BigDecimal.valueOf(95.0),
+                    "STORED",
+                    null
+            ));
+            documentContents.save(new DocumentContent(doc.getId(), bytes));
+
+            // Clean & infer metadata
+            String resolvedCompany = (clientCompany != null && !clientCompany.isBlank())
+                    ? clientCompany.trim()
+                    : extractCompanyNameFromFilename(safeFilename);
+            String resolvedContact = (contactName != null && !contactName.isBlank()) ? contactName.trim() : "Executive Decision Maker";
+            String resolvedEmail = (contactEmail != null && !contactEmail.isBlank())
+                    ? contactEmail.trim().toLowerCase()
+                    : extractEmailOrFallback(extractedText, resolvedCompany);
+            String resolvedIndustry = (industry != null && !industry.isBlank()) ? industry.trim() : "Technology & Enterprise Solutions";
+            String resolvedUseCase = (useCase != null && !useCase.isBlank())
+                    ? useCase.trim()
+                    : "Client proposal document: " + safeFilename;
+            BigDecimal resolvedBudget = (budget != null && budget.compareTo(BigDecimal.ZERO) > 0) ? budget : BigDecimal.valueOf(50000.00);
+            String resolvedTimeline = (timeline != null && !timeline.isBlank()) ? timeline.trim() : "3 Months";
+            List<String> resolvedServices = (services != null && !services.isEmpty())
+                    ? services
+                    : List.of("Document Intake AI", "Enterprise Solution Integration", "SLA Support");
+            String resolvedStatus = (status != null && !status.isBlank()) ? status.trim().toUpperCase() : "ACTIVE";
+
+            // Build rich content json
+            String textSnippet = extractedText.length() > 500
+                    ? extractedText.substring(0, 500).trim().replaceAll("\\s+", " ") + "..."
+                    : extractedText.trim().replaceAll("\\s+", " ");
+            if (textSnippet.isBlank()) {
+                textSnippet = "Original signed/formal business proposal uploaded: " + safeFilename;
+            }
+
+            Map<String, Object> contentMap = new LinkedHashMap<>();
+            contentMap.put("title", resolvedCompany + " Enterprise Proposal");
+            contentMap.put("sourceType", "UPLOADED_DOCUMENT");
+            contentMap.put("documentId", doc.getId().toString());
+            contentMap.put("originalFilename", safeFilename);
+            contentMap.put("fileSize", file.getSize());
+            contentMap.put("contentType", detectedContentType);
+            contentMap.put("uploadedAt", Instant.now().toString());
+            contentMap.put("executiveSummary", textSnippet);
+            contentMap.put("challenges", resolvedUseCase);
+            contentMap.put("solutionArchitecture", "Comprehensive enterprise delivery per attached " + safeFilename);
+            contentMap.put("scopeOfWork", resolvedServices);
+            contentMap.put("commercialTerms", "Pricing and terms defined in attached document: " + safeFilename + ". Valid for 30 days.");
+            contentMap.put("pricingBreakdown", List.of(Map.of("item", "Proposal Deliverables (" + safeFilename + ")", "amount", resolvedBudget)));
+
+            int probability = "ACTIVE".equalsIgnoreCase(resolvedStatus) ? 60 : ("SENT".equalsIgnoreCase(resolvedStatus) ? 75 : 40);
+
+            MarketingProposal proposal = new MarketingProposal(
+                    UUID.randomUUID(),
+                    tenantId,
+                    resolvedCompany,
+                    resolvedContact,
+                    resolvedEmail,
+                    resolvedIndustry,
+                    resolvedUseCase,
+                    json.writeValueAsString(resolvedServices),
+                    resolvedBudget,
+                    resolvedTimeline,
+                    json.writeValueAsString(contentMap),
+                    resolvedStatus,
+                    probability
+            );
+
+            return view(proposals.save(proposal));
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to upload proposal document", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not upload proposal document: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/document")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        var p = owned(id, tenant(auth));
+        try {
+            Map<String, Object> contentMap = p.getContentJson() != null
+                    ? json.readValue(p.getContentJson(), json.getTypeFactory().constructMapType(Map.class, String.class, Object.class))
+                    : Map.of();
+            String docIdStr = (String) contentMap.get("documentId");
+            if (docIdStr == null || docIdStr.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No document attached to this proposal");
+            }
+            UUID docId = UUID.fromString(docIdStr);
+            var doc = documents.findById(docId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attached document record not found"));
+            var docContent = documentContents.findById(docId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document binary file not found"));
+
+            String filename = doc.getOriginalFilename() != null ? doc.getOriginalFilename() : "proposal-document.pdf";
+            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            try { mediaType = MediaType.parseMediaType(doc.getContentType()); } catch (Exception ignored) {}
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                    .body(docContent.getContent());
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Could not fetch proposal document file", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error reading proposal document");
+        }
+    }
+
+    private String extractCompanyNameFromFilename(String filename) {
+        String clean = filename.replaceFirst("\\.[a-zA-Z0-9]+$", "");
+        clean = clean.replaceAll("[_-]", " ").replaceAll("(?i)(proposal|contract|draft|v\\d+|final)", "").trim();
+        return clean.isBlank() ? "Enterprise Client" : clean;
+    }
+
+    private String extractEmailOrFallback(String text, String company) {
+        var m = java.util.regex.Pattern.compile("(?i)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")
+                .matcher(text != null ? text : "");
+        if (m.find()) return m.group().toLowerCase();
+        String domain = company.toLowerCase().replaceAll("[^a-z0-9]", "") + ".com";
+        return "procurement@" + (domain.length() > 4 ? domain : "client.com");
+    }
+
     @PutMapping("/{id}")
     public ProposalView update(@PathVariable UUID id, @Valid @RequestBody ProposalEdit edit, JwtAuthenticationToken auth) {
         var p = owned(id, tenant(auth));
@@ -238,17 +432,43 @@ public class MarketingProposalController {
         }
         try {
             var message = mail.createMimeMessage();
-            var helper = new MimeMessageHelper(message, attachment != null && !attachment.isEmpty(), "UTF-8");
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(from);
             helper.setTo(p.getContactEmail());
             helper.setSubject(subject == null || subject.isBlank() ? "Enterprise Business Proposal: " + p.getClientCompany() : subject.trim());
             helper.setText(contentHtml == null || contentHtml.isBlank() ? renderProposalHtml(p) : contentHtml, true);
             if (replyTo != null && !replyTo.isBlank()) helper.setReplyTo(replyTo.trim());
+            
+            boolean attached = false;
             if (attachment != null && !attachment.isEmpty()) {
                 String filename = attachment.getOriginalFilename() == null ? "attachment" : attachment.getOriginalFilename().replaceAll("[\\\\/]", "_");
                 helper.addAttachment(filename, new ByteArrayResource(attachment.getBytes()),
                         attachment.getContentType() == null ? "application/octet-stream" : attachment.getContentType());
+                attached = true;
             }
+            
+            // If no explicit attachment but proposal has an uploaded document, auto-attach it!
+            if (!attached && p.getContentJson() != null) {
+                try {
+                    Map<String, Object> contentMap = json.readValue(p.getContentJson(),
+                            json.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
+                    String docIdStr = (String) contentMap.get("documentId");
+                    if (docIdStr != null && !docIdStr.isBlank()) {
+                        UUID docId = UUID.fromString(docIdStr);
+                        var doc = documents.findById(docId).orElse(null);
+                        var docContent = documentContents.findById(docId).orElse(null);
+                        if (doc != null && docContent != null) {
+                            String attName = doc.getOriginalFilename() != null ? doc.getOriginalFilename() : "Proposal_Document.pdf";
+                            helper.addAttachment(attName, new ByteArrayResource(docContent.getContent()),
+                                    doc.getContentType() != null ? doc.getContentType() : "application/pdf");
+                            log.info("Auto-attached uploaded proposal document {} to outgoing email", attName);
+                        }
+                    }
+                } catch (Exception err) {
+                    log.warn("Could not auto-attach stored proposal file: {}", err.getMessage());
+                }
+            }
+
             mail.send(message);
         } catch (Exception e) {
             log.error("Proposal email dispatch failed for proposal {}", id, e);

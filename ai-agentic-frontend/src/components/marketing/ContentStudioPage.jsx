@@ -286,12 +286,22 @@ export const ContentStudioPage = () => {
         if (prop.campaignName) setCampaignName(prop.campaignName);
         if (prop.subject) setEmailSubject(prop.subject);
         if (prop.bodyHtml) setEmailBodyHtml(prop.bodyHtml);
-        if (prop.domain) {
+
+        if (prop.contactEmail) {
+          setAudienceType('DIRECT');
+          setDirectEmail(prop.contactEmail.trim());
+          if (prop.contactName) {
+            const parts = prop.contactName.trim().split(/\s+/);
+            setDirectFirstName(parts[0] || '');
+            setDirectLastName(parts.slice(1).join(' ') || '');
+          }
+          if (prop.company) setDirectCompany(prop.company.trim());
+        } else if (prop.domain) {
           setAudienceType('DOMAIN');
           setTargetDomain(prop.domain);
           fetchDomainContacts(prop.domain);
         }
-        showFeedback(`Proposal for ${prop.company} loaded into Email Sender!`, 'success');
+        showFeedback(`Proposal for ${prop.company} loaded into Email Sender! Contact: ${prop.contactEmail || prop.domain}`, 'success');
       } catch (e) {}
       localStorage.removeItem('selectedProposalCampaign');
     }

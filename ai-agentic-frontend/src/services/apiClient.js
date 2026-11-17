@@ -1754,6 +1754,94 @@ export async function createProposal(payload) {
 }
 
 /**
+ * Upload Existing Proposal Document
+ * POST /api/marketing/proposals/upload
+ * Multipart form data: file, clientCompany, contactName, contactEmail, industry, useCase, budget, timeline, status, services
+ */
+export async function uploadProposalDocument(formData) {
+  let headers = getAuthHeaders();
+  delete headers['Content-Type'];
+
+  let res = await fetch(`${BACKEND_URL}/api/marketing/proposals/upload`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        const freshHeaders = getAuthHeaders();
+        delete freshHeaders['Content-Type'];
+        res = await fetch(`${BACKEND_URL}/api/marketing/proposals/upload`, {
+          method: 'POST',
+          headers: freshHeaders,
+          body: formData,
+        });
+      }
+    } catch {}
+  }
+
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to upload proposal document');
+    throw new Error(err);
+  }
+
+  return res.json();
+}
+
+/**
+ * Download Proposal Original Document File
+ * GET /api/marketing/proposals/:id/document
+ */
+export async function downloadProposalDocument(proposalId, fallbackFilename = 'proposal-document.pdf') {
+  if (!proposalId) throw new Error('proposalId is required');
+  let headers = getAuthHeaders();
+
+  let res = await fetch(`${BACKEND_URL}/api/marketing/proposals/${encodeURIComponent(proposalId)}/document`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        headers = getAuthHeaders();
+        res = await fetch(`${BACKEND_URL}/api/marketing/proposals/${encodeURIComponent(proposalId)}/document`, {
+          method: 'GET',
+          headers,
+        });
+      }
+    } catch {}
+  }
+
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to download proposal document');
+    throw new Error(err);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') || '';
+  let filename = fallbackFilename;
+  const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+  if (match) {
+    filename = decodeURIComponent(match[1]);
+  }
+
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+  return filename;
+}
+
+/**
  * List Proposals
  * GET /api/marketing/proposals
  */

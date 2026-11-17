@@ -29,9 +29,16 @@ public class MarketingProposal {
     @Column(name="updated_at", nullable=false) private Instant updatedAt;
     protected MarketingProposal() {}
     public MarketingProposal(UUID id, UUID tenantId, String company, String name, String email, String industry, String useCase, String servicesJson, BigDecimal budget, String timeline, String contentJson) {
-        this.id=id; this.tenantId=tenantId; this.clientCompany=company; this.contactName=name; this.contactEmail=email; this.industry=industry; this.useCase=useCase; this.servicesJson=servicesJson; this.budget=budget; this.timeline=timeline; this.contentJson=contentJson; this.status="DRAFT"; this.winProbability=25; this.createdAt=Instant.now(); this.updatedAt=this.createdAt;
+        this(id, tenantId, company, name, email, industry, useCase, servicesJson, budget, timeline, contentJson, "DRAFT", 25);
+    }
+    public MarketingProposal(UUID id, UUID tenantId, String company, String name, String email, String industry, String useCase, String servicesJson, BigDecimal budget, String timeline, String contentJson, String status, int winProbability) {
+        this.id=id; this.tenantId=tenantId; this.clientCompany=company; this.contactName=name; this.contactEmail=email; this.industry=industry; this.useCase=useCase; this.servicesJson=servicesJson; this.budget=budget; this.timeline=timeline; this.contentJson=contentJson;
+        this.status = (status != null && !status.isBlank()) ? status.trim().toUpperCase() : "ACTIVE";
+        this.winProbability = winProbability > 0 ? winProbability : ("ACTIVE".equalsIgnoreCase(this.status) ? 60 : 25);
+        this.createdAt=Instant.now(); this.updatedAt=this.createdAt;
     }
     public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public String getClientCompany(){return clientCompany;} public String getContactName(){return contactName;} public String getContactEmail(){return contactEmail;} public String getIndustry(){return industry;} public String getUseCase(){return useCase;} public String getServicesJson(){return servicesJson;} public BigDecimal getBudget(){return budget;} public String getTimeline(){return timeline;} public String getContentJson(){return contentJson;} public String getStatus(){return status;} public int getWinProbability(){return winProbability;} public String getNextAction(){return nextAction;} public LocalDate getFollowUpDate(){return followUpDate;} public Instant getSentAt(){return sentAt;} public Instant getUpdatedAt(){return updatedAt;}
+    public void setStatus(String status){if(status!=null&&!status.isBlank()){this.status=status.trim().toUpperCase();this.updatedAt=Instant.now();}}
     public void update(String contentJson, String status, int probability, String action, LocalDate followUp){this.contentJson=contentJson; if(status!=null)this.status=status; this.winProbability=probability; this.nextAction=action; this.followUpDate=followUp; this.updatedAt=Instant.now();}
     public void markSent(){this.status="SENT";this.sentAt=Instant.now();this.updatedAt=this.sentAt;}
 }

@@ -8,15 +8,19 @@ import {
   generateAiProposal,
   updateProposal as apiUpdateProposal,
   sendProposalEmail,
-  getProposalPipeline
+  getProposalPipeline,
+  uploadProposalDocument,
+  downloadProposalDocument
 } from '../../services/apiClient';
 import {
   FileText, Send, CheckCircle, Clock, AlertTriangle, TrendingUp, DollarSign,
   Edit3, XCircle, Sparkles, Plus, Loader2, Printer, Eye, Building2, User,
-  Mail, Calendar, Briefcase, Layers, ArrowRight, ShieldCheck, Check
+  Mail, Calendar, Briefcase, Layers, ArrowRight, ShieldCheck, Check,
+  UploadCloud, Paperclip, Download
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
+  ACTIVE:       { label: 'Active',        color: '#06b6d4',             cls: 'info' },
   DRAFT:        { label: 'Draft',         color: 'var(--text-muted)',   cls: '' },
   SENT:         { label: 'Sent',          color: '#6366f1',             cls: '' },
   UNDER_REVIEW: { label: 'Under Review',  color: '#f59e0b',             cls: 'warning' },
@@ -51,6 +55,23 @@ export const ProposalsPage = () => {
   const [saveLoading, setSaveLoading] = useState(false);
   const [genError, setGenError] = useState('');
   const [successToast, setSuccessToast] = useState('');
+
+  // Upload Document Modal state
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadFormData, setUploadFormData] = useState({
+    clientCompany: '',
+    contactName: '',
+    contactEmail: '',
+    industry: 'Logistics & Supply Chain',
+    useCase: 'Existing enterprise proposal document intake & delivery',
+    services: ['Document Intake AI', 'Exception Queue Manager'],
+    budget: '50000',
+    timeline: '3 months',
+    status: 'ACTIVE'
+  });
 
   // Sending email state
   const [sendingId, setSendingId] = useState(null);
@@ -212,6 +233,89 @@ export const ProposalsPage = () => {
     }
   };
 
+  const handleDownloadDocument = async (prop) => {
+    try {
+      const filename = prop.content?.originalFilename || `${prop.company}-Proposal.pdf`;
+      await downloadProposalDocument(prop.id, filename);
+      setSuccessToast(`Downloaded proposal document: ${filename}`);
+      setTimeout(() => setSuccessToast(''), 3000);
+    } catch (err) {
+      alert(`Download failed: ${err.message}`);
+    }
+  };
+
+  const handleUploadServiceToggle = (srv) => {
+    setUploadFormData(prev => {
+      const exists = prev.services.includes(srv);
+      return {
+        ...prev,
+        services: exists ? prev.services.filter(s => s !== srv) : [...prev.services, srv]
+      };
+    });
+  };
+
+  const handleUploadFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+      if (!uploadFormData.clientCompany) {
+        const baseName = file.name.replace(/\.[^/.]+$/, '');
+        const clean = baseName.replace(/[_-]/g, ' ').replace(/(?i)(proposal|contract|draft|final|v\d+)/g, '').trim();
+        if (clean) {
+          setUploadFormData(prev => ({
+            ...prev,
+            clientCompany: clean.charAt(0).toUpperCase() + clean.slice(1)
+          }));
+        }
+      }
+    }
+  };
+
+  const handleUploadProposalSubmit = async (e) => {
+    e.preventDefault();
+    if (!uploadFile) {
+      setUploadError('Please select a proposal document (PDF, DOCX, etc.)');
+      return;
+    }
+    if (!uploadFormData.clientCompany.trim()) {
+      setUploadError('Client company name is required');
+      return;
+    }
+    if (!uploadFormData.contactEmail.trim()) {
+      setUploadError('Contact email is required for direct email dispatch');
+      return;
+    }
+
+    setUploadLoading(true);
+    setUploadError('');
+
+    try {
+      const data = new FormData();
+      data.append('file', uploadFile);
+      data.append('clientCompany', uploadFormData.clientCompany.trim());
+      data.append('contactName', uploadFormData.contactName.trim() || 'Executive Decision Maker');
+      data.append('contactEmail', uploadFormData.contactEmail.trim().toLowerCase());
+      data.append('industry', uploadFormData.industry.trim());
+      data.append('useCase', uploadFormData.useCase.trim());
+      data.append('budget', uploadFormData.budget);
+      data.append('timeline', uploadFormData.timeline.trim());
+      data.append('status', uploadFormData.status || 'ACTIVE');
+      uploadFormData.services.forEach(s => data.append('services', s));
+
+      const created = await uploadProposalDocument(data);
+      setSuccessToast(`Proposal document "${uploadFile.name}" uploaded successfully for ${uploadFormData.clientCompany} with status ${uploadFormData.status || 'ACTIVE'}!`);
+      setTimeout(() => setSuccessToast(''), 4500);
+
+      setUploadModalOpen(false);
+      setUploadFile(null);
+      fetchLiveProposals();
+    } catch (err) {
+      setUploadError(err.message || 'Failed to upload proposal document');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const handleOpenInEmailSender = (prop) => {
     const domain = prop.contactEmail && prop.contactEmail.includes('@')
       ? prop.contactEmail.split('@')[1]
@@ -225,8 +329,16 @@ export const ProposalsPage = () => {
 
     const terms = prop.content?.commercialTerms || `Valid until ${prop.validUntil}`;
 
+    const attachmentNotice = prop.content?.originalFilename
+      ? `<div style="padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-size: 13px; margin-bottom: 16px;">
+          📎 <strong>Attached Official Proposal Document:</strong> ${prop.content.originalFilename} (${Math.round((prop.content.fileSize || 0) / 1024)} KB)
+        </div>`
+      : '';
+
     const emailHtml = `<p>Dear ${prop.contactName || 'Team'},</p>
 <p>Thank you for discussing your operational objectives for <strong>${prop.company}</strong>. We are pleased to present our comprehensive commercial and technical proposal for your review.</p>
+
+${attachmentNotice}
 
 <h3>Executive Summary</h3>
 <p>${execSummary}</p>
@@ -247,10 +359,13 @@ ${deliverables}
     localStorage.setItem('selectedProposalCampaign', JSON.stringify({
       proposalId: prop.id,
       company: prop.company,
+      contactEmail: prop.contactEmail,
+      contactName: prop.contactName,
       domain: domain,
       subject: `Enterprise Business Proposal: ${prop.title || prop.company}`,
       campaignName: `${prop.company} Proposal Outreach`,
-      bodyHtml: emailHtml
+      bodyHtml: emailHtml,
+      originalFilename: prop.content?.originalFilename
     }));
 
     dispatch(setActiveRoute('marketing.studio'));
@@ -288,13 +403,23 @@ ${deliverables}
           <p>AI-powered proposal drafting, milestone scoping, contract value modeling, and client transmission.</p>
         </div>
 
-        <button
-          className="btn btn-primary"
-          onClick={() => { setModalOpen(true); setGeneratedDraft(null); setGenError(''); }}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13 }}
-        >
-          <Sparkles size={16} /> Create AI Proposal
-        </button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => { setUploadModalOpen(true); setUploadError(''); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', fontSize: 13 }}
+          >
+            <UploadCloud size={16} color="#06b6d4" /> Upload Proposal Document
+          </button>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => { setModalOpen(true); setGeneratedDraft(null); setGenError(''); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13 }}
+          >
+            <Sparkles size={16} /> Create AI Proposal
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -332,7 +457,7 @@ ${deliverables}
         <div>
           {/* Filter Bar */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-            {['ALL', 'DRAFT', 'SENT', 'UNDER_REVIEW', 'NEGOTIATION', 'ACCEPTED', 'REJECTED'].map(s => (
+            {['ALL', 'ACTIVE', 'DRAFT', 'SENT', 'UNDER_REVIEW', 'NEGOTIATION', 'ACCEPTED', 'REJECTED'].map(s => (
               <button
                 key={s}
                 className={`btn btn-xs ${filter === s ? 'btn-solid' : 'btn-ghost'}`}
@@ -349,7 +474,7 @@ ${deliverables}
               <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
                 <FileText size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                 <h4>No proposals found for this filter</h4>
-                <p style={{ fontSize: 13, marginTop: 4 }}>Click <strong>"Create AI Proposal"</strong> above to draft your first proposal.</p>
+                <p style={{ fontSize: 13, marginTop: 4 }}>Click <strong>"Upload Proposal Document"</strong> or <strong>"Create AI Proposal"</strong> above.</p>
               </div>
             ) : (
               filtered.map(prop => {
@@ -373,6 +498,18 @@ ${deliverables}
                           </span>
                           <span className={`badge ${sc.cls}`} style={{ fontSize: 10 }}>{sc.label}</span>
                           <span className="badge" style={{ fontSize: 10 }}>{prop.version}</span>
+                          {prop.content?.originalFilename && (
+                            <button
+                              type="button"
+                              className="badge"
+                              onClick={(e) => { e.stopPropagation(); handleDownloadDocument(prop); }}
+                              title="Download uploaded proposal document"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', background: 'rgba(6, 182, 212, 0.12)', color: '#06b6d4', border: '1px solid rgba(6, 182, 212, 0.3)', padding: '2px 8px', borderRadius: 4 }}
+                            >
+                              <Paperclip size={10} /> {prop.content.originalFilename}
+                              <Download size={10} />
+                            </button>
+                          )}
                           {prop.sentDate ? (
                             <span className="badge success" style={{ fontSize: 10 }}>Sent {prop.sentDate}</span>
                           ) : (
@@ -510,6 +647,39 @@ ${deliverables}
                 ))}
               </div>
 
+              {/* Attached Official Proposal File (if uploaded) */}
+              {selectedProp.content?.originalFilename && (
+                <div style={{
+                  padding: '10px 12px',
+                  background: 'rgba(6, 182, 212, 0.08)',
+                  border: '1px solid rgba(6, 182, 212, 0.25)',
+                  borderRadius: 7,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, overflow: 'hidden' }}>
+                    <Paperclip size={14} color="#06b6d4" style={{ flexShrink: 0 }} />
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        {selectedProp.content.originalFilename}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                        {selectedProp.content.fileSize ? `${Math.round(selectedProp.content.fileSize / 1024)} KB · ` : ''}Original Proposal Document
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-secondary"
+                    onClick={() => handleDownloadDocument(selectedProp)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                  >
+                    <Download size={11} /> Download
+                  </button>
+                </div>
+              )}
+
               {/* Email Delivery Options */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button
@@ -517,7 +687,7 @@ ${deliverables}
                   style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}
                   onClick={() => handleOpenInEmailSender(selectedProp)}
                 >
-                  <Mail size={14} /> Open in Email Sender (Review & Send)
+                  <Mail size={14} /> Open in Email Sender (Direct Dispatch)
                 </button>
 
                 <button
@@ -528,6 +698,7 @@ ${deliverables}
                 >
                   {sendingId === selectedProp.id ? <Loader2 size={12} className="spin" /> : <Send size={12} />}
                   Direct Quick Send to {selectedProp.contactEmail || 'Client'}
+                  {selectedProp.content?.originalFilename && <span style={{ opacity: 0.7 }}>(+ Attached Doc)</span>}
                 </button>
               </div>
 
@@ -595,7 +766,7 @@ ${deliverables}
                   Update Deal Status
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {['DRAFT', 'UNDER_REVIEW', 'NEGOTIATION', 'ACCEPTED', 'REJECTED'].map(s => (
+                  {['ACTIVE', 'DRAFT', 'SENT', 'UNDER_REVIEW', 'NEGOTIATION', 'ACCEPTED', 'REJECTED'].map(s => (
                     <button
                       key={s}
                       className={`btn btn-xs ${selectedProp.status === s ? 'btn-solid' : 'btn-ghost'}`}
@@ -876,6 +1047,224 @@ ${deliverables}
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Existing Proposal Document Modal */}
+      {uploadModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.65)', zIndex: 10000,
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          padding: 20
+        }}>
+          <div className="card" style={{
+            width: '100%', maxWidth: 700, maxHeight: '92vh',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+            overflow: 'hidden', padding: 0
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid var(--border-default)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <UploadCloud size={18} color="#06b6d4" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Upload Existing Proposal Document</h3>
+              </div>
+              <button className="btn btn-ghost btn-xs" onClick={() => setUploadModalOpen(false)}>✕</button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: 20, overflowY: 'auto' }}>
+              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16, marginTop: 0 }}>
+                Upload an existing formal RFP or client proposal document (PDF, Word, Text). The platform extracts its text using Apache Tika, registers it with an <strong>ACTIVE</strong> deal status, attaches the file, and enables instant direct email dispatch.
+              </p>
+
+              {uploadError && (
+                <div style={{
+                  padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 6,
+                  color: '#ef4444', fontSize: 12.5, marginBottom: 14,
+                  display: 'flex', alignItems: 'center', gap: 8
+                }}>
+                  <AlertTriangle size={14} /> {uploadError}
+                </div>
+              )}
+
+              <form onSubmit={handleUploadProposalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* File Upload Box */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                    Proposal Document File (PDF, DOCX, TXT) *
+                  </label>
+                  <div style={{
+                    padding: 16, border: '2px dashed var(--border-default)',
+                    borderRadius: 8, textAlign: 'center', background: 'var(--bg-hover)',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="file"
+                      id="proposalFileInput"
+                      style={{ display: 'none' }}
+                      accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.xlsx,.csv"
+                      onChange={handleUploadFileSelect}
+                    />
+                    <label htmlFor="proposalFileInput" style={{ cursor: 'pointer', display: 'block' }}>
+                      <UploadCloud size={28} color="#06b6d4" style={{ margin: '0 auto 8px' }} />
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        {uploadFile ? uploadFile.name : 'Click to select or drop proposal document'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                        {uploadFile ? `${Math.round(uploadFile.size / 1024)} KB · Ready to ingest` : 'Supports PDF, Word (.docx), Plain Text (up to 20 MB)'}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Client Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. Maersk Global Logistics"
+                      value={uploadFormData.clientCompany}
+                      onChange={e => setUploadFormData({ ...uploadFormData, clientCompany: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Initial Deal Status (Industry Standard) *
+                    </label>
+                    <select
+                      className="input"
+                      value={uploadFormData.status}
+                      onChange={e => setUploadFormData({ ...uploadFormData, status: e.target.value })}
+                    >
+                      <option value="ACTIVE">ACTIVE (Active in Pipeline / Ready)</option>
+                      <option value="DRAFT">DRAFT (Drafting & Internal Review)</option>
+                      <option value="UNDER_REVIEW">UNDER REVIEW (Client Evaluation)</option>
+                      <option value="NEGOTIATION">NEGOTIATION (Terms & Pricing)</option>
+                      <option value="SENT">SENT (Transmitted to Client)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Recipient Contact Name
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. Sarah Jenkins (VP Operations)"
+                      value={uploadFormData.contactName}
+                      onChange={e => setUploadFormData({ ...uploadFormData, contactName: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Recipient Contact Email (For Direct Email Send) *
+                    </label>
+                    <input
+                      type="email"
+                      className="input"
+                      placeholder="e.g. s.jenkins@maersk.com"
+                      value={uploadFormData.contactEmail}
+                      onChange={e => setUploadFormData({ ...uploadFormData, contactEmail: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Stated Contract Value ($ USD)
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={uploadFormData.budget}
+                      onChange={e => setUploadFormData({ ...uploadFormData, budget: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Proposed Delivery Timeline
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={uploadFormData.timeline}
+                      onChange={e => setUploadFormData({ ...uploadFormData, timeline: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                    Industry / Vertical
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={uploadFormData.industry}
+                    onChange={e => setUploadFormData({ ...uploadFormData, industry: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                    Services / Products Covered
+                  </label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {AVAILABLE_SERVICES.map(srv => {
+                      const sel = uploadFormData.services.includes(srv);
+                      return (
+                        <button
+                          key={srv}
+                          type="button"
+                          className={`btn btn-xs ${sel ? 'btn-solid' : 'btn-ghost'}`}
+                          onClick={() => handleUploadServiceToggle(srv)}
+                        >
+                          {sel ? '✓ ' : '+ '}{srv}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={uploadLoading || !uploadFile}
+                    style={{ flex: 1, padding: '10px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}
+                  >
+                    {uploadLoading ? <Loader2 size={16} className="spin" /> : <UploadCloud size={16} />}
+                    {uploadLoading ? 'Uploading & Extracting Document...' : 'Upload & Add to Active Proposals'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setUploadModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
