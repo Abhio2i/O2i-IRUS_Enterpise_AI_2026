@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic AI Platform - Postman API Studio & Intake Cockpit</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+    <!-- Main Navigation Header -->
+    <header class="header">
+        <div class="brand">
+            <div class="brand-icon">⚡</div>
+            <div>
+                <div>Agentic AI Platform</div>
+                <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: normal;">Postman Collection v2.1 • Zero-Trust Engine</div>
+            </div>
+        </div>
+
+        <!-- View Navigation Switcher -->
+        <div class="view-nav">
+            <button id="view-postman-btn" class="view-nav-btn active">
+                <span>🚀</span> Postman API Studio
+            </button>
+            <button id="view-proposals-btn" class="view-nav-btn">Proposals</button>
+            <button id="view-dashboard-btn" class="view-nav-btn">
+                <span>📊</span> Intake Cockpit
+            </button>
+        </div>
+
+        <div class="header-actions">
+            <!-- Active User Display (When Logged In) -->
+            <div id="user-display" class="user-badge" style="display: none;">
+                <div class="user-avatar" id="user-avatar">A</div>
+                <div>
+                    <div id="user-name" style="font-weight: 600; font-size: 0.8rem;">Admin</div>
+                    <div id="user-email" style="font-size: 0.65rem; color: var(--text-muted);">admin@example.com</div>
+                </div>
+            </div>
+
+            <!-- Login / Register Button (When Logged Out) -->
+            <button id="nav-login-btn" class="btn btn-primary btn-sm">
+                🔑 Sign In / Register
+            </button>
+
+            <!-- Refresh & Logout Buttons (When Logged In) -->
+            <button id="nav-refresh-btn" class="btn btn-secondary btn-sm" style="display: none;" title="Refresh access and refresh cookies">
+                ↻ Refresh Token
+            </button>
+            <button id="nav-logout-btn" class="btn btn-danger btn-sm" style="display: none;" title="Revoke session and clear cookies">
+                Logout
+            </button>
+        </div>
+    </header>
+
+    <!-- Postman Environment Variables Quick Bar -->
+    <div class="vars-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: nowrap; overflow-x: auto;">
+            <span style="font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem;">Postman Env:</span>
+            
+            <div class="var-tag">
+                <span class="var-name">baseUrl:</span>
+                <span id="quick-baseUrl" class="var-val">http://localhost:9095</span>
+            </div>
+            <div class="var-tag">
+                <span class="var-name">tenantId:</span>
+                <span id="quick-tenantId" class="var-val">11111111...</span>
+            </div>
+            <div class="var-tag">
+                <span class="var-name">email:</span>
+                <span id="quick-email" class="var-val">admin@example.com</span>
+            </div>
+            <div class="var-tag">
+                <span class="var-name">documentId:</span>
+                <span id="quick-documentId" class="var-val">(none)</span>
+            </div>
+        </div>
+
+        <button id="edit-vars-btn" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;">
+            ⚙ Variables
+        </button>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="main-container">
+
+        <!-- ============================================== -->
+        <!-- VIEW 1: POSTMAN API STUDIO                     -->
+        <!-- ============================================== -->
+        <section id="view-postman" class="postman-studio">
+
+            <!-- Left: Postman Collection Sidebar -->
+            <div class="collection-sidebar">
+                <div class="sidebar-header">
+                    <div>
+                        <div style="font-weight: 700; font-size: 0.9rem; color: #ffffff;">Collection Requests</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">8 endpoints from Postman</div>
+                    </div>
+                    <span class="badge badge-info">v2.1</span>
+                </div>
+
+                <div class="collection-list" id="collection-list">
+                    <!-- Request Items populated via JS -->
+                </div>
+
+                <div class="runner-card">
+                    <button id="run-collection-btn" class="btn btn-primary btn-block btn-sm">
+                        ▶ Run Entire Collection (Auto Test)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Interactive Request / Response Workbench -->
+            <div class="workbench-main">
+
+                <!-- Request Card -->
+                <div class="request-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div>
+                            <h2 id="req-title" style="font-size: 1.15rem; font-weight: 700; color: #ffffff;">Register User</h2>
+                            <p id="req-desc" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                Creates a user in an existing tenant.
+                            </p>
+                        </div>
+                        <span id="req-badge" class="badge badge-post">POST</span>
+                    </div>
+
+                    <!-- URL Bar -->
+                    <div class="url-bar">
+                        <div class="url-input-wrap">
+                            <span id="url-method-display" class="url-method-select">POST</span>
+                            <input type="text" id="url-input" class="url-input" value="{{baseUrl}}/api/auth/register">
+                        </div>
+                        <button id="send-request-btn" class="btn btn-primary">
+                            <span>⚡</span> Send
+                        </button>
+                    </div>
+
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+                        <span>Evaluated URL: </span>
+                        <code id="evaluated-url-preview" style="color: var(--accent-blue);">http://localhost:9095/api/auth/register</code>
+                    </div>
+
+                    <!-- Sub Tabs: Body / Headers / Params -->
+                    <div class="sub-tabs">
+                        <button id="tab-req-body" class="sub-tab active">Body</button>
+                        <button id="tab-req-headers" class="sub-tab">Headers (<span id="headers-count">0</span>)</button>
+                    </div>
+
+                    <!-- Tab Panel: Body -->
+                    <div id="panel-req-body">
+                        <!-- JSON Body Editor -->
+                        <div id="body-json-wrap">
+                            <textarea id="body-json-editor" class="code-editor" spellcheck="false"></textarea>
+                        </div>
+
+                        <!-- FormData File Upload Editor (for /api/documents/intake) -->
+                        <div id="body-formdata-wrap" style="display: none;">
+                            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;">
+                                <div class="form-group">
+                                    <label class="form-label">file (Multipart)</label>
+                                    <input type="file" id="postman-file-input" class="form-input">
+                                    <div class="form-hint">Leave blank to automatically send a pre-configured sample invoice text document!</div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">documentType</label>
+                                    <select id="postman-doc-type" class="form-select">
+                                        <option value="INVOICE">INVOICE</option>
+                                        <option value="RECEIPT">RECEIPT</option>
+                                        <option value="CONTRACT">CONTRACT</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label">source</label>
+                                    <input type="text" id="postman-doc-source" class="form-input" value="{{source}}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No Body Notice -->
+                        <div id="body-none-wrap" style="display: none; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; background: var(--bg-primary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                            This request does not send a body.
+                        </div>
+                    </div>
+
+                    <!-- Tab Panel: Headers -->
+                    <div id="panel-req-headers" style="display: none;">
+                        <div class="table-container">
+                            <table class="data-table" style="font-family: monospace; font-size: 0.8rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Header</th>
+                                        <th>Template Value</th>
+                                        <th>Evaluated Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="headers-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Response Card -->
+                <div class="response-card">
+                    <div class="response-header">
+                        <div style="font-weight: 700; font-size: 0.9rem; color: #ffffff;">Response</div>
+                        <div class="response-meta">
+                            <span id="res-status-badge" class="badge badge-info">Waiting for request...</span>
+                            <span id="res-time">0 ms</span>
+                        </div>
+                    </div>
+
+                    <div class="response-body-wrap">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <div class="sub-tabs" style="margin-bottom: 0; border-bottom: none;">
+                                <button id="tab-res-body" class="sub-tab active">Body</button>
+                                <button id="tab-res-headers" class="sub-tab">Response Headers</button>
+                            </div>
+                            <button id="copy-response-btn" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;">
+                                📋 Copy
+                            </button>
+                        </div>
+
+                        <!-- Response Body -->
+                        <div id="panel-res-body">
+                            <pre id="response-json" class="json-pre">Click "⚡ Send" above to trigger this API endpoint.</pre>
+                        </div>
+
+                        <!-- Response Headers -->
+                        <div id="panel-res-headers" style="display: none;">
+                            <pre id="response-headers-box" class="json-pre" style="color: #94a3b8;"></pre>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <section class="card" style="margin-top:1.25rem;">
+                <div class="card-header"><div><h2 class="card-title">Import Marketing Contacts</h2><p style="font-size:.8rem;color:var(--text-muted);">Upload a UTF-8 CSV. We’ll check its columns before import and show any row issues.</p></div></div>
+                <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+                    <input type="file" id="contacts-csv-file" class="form-input" accept=".csv,text/csv" style="max-width:380px;">
+                    <button id="contacts-csv-upload" class="btn btn-primary" disabled>Import CSV</button>
+                    <button id="contacts-csv-sample" class="btn btn-secondary" type="button">Download sample CSV</button>
+                </div>
+                <div id="contacts-csv-check" style="margin-top:.75rem;font-size:.85rem;color:var(--text-muted);"></div>
+                <div id="contacts-csv-report" style="margin-top:.75rem;"></div>
+            </section>
+            <section class="card" style="margin-top:1.25rem;">
+                <div class="card-header"><div><h2 class="card-title">Filter a Saved Contact List with AI</h2><p style="font-size:.8rem;color:var(--text-muted);">Choose a source list. AI will select matching contacts only from that list and save the results as a new list.</p></div></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;">
+                    <select id="ai-source-list" class="form-select"><option value="">All imported contacts</option></select>
+                    <input id="ai-list-name" class="form-input" placeholder="Name for filtered list (optional)">
+                </div>
+                <textarea id="ai-list-prompt" class="form-input" rows="3" style="margin-top:.75rem" placeholder="Example: active automotive customers in Canada"></textarea>
+                <button id="ai-filter-list" class="btn btn-primary" style="margin-top:.75rem">Filter and Save List</button>
+                <div id="ai-list-result" style="margin-top:.75rem"></div>
+            </section>
+            <section class="card" style="margin-top:1.25rem;">
+                <div class="card-header"><div><h2 class="card-title">Email Campaign</h2><p style="font-size:.8rem;color:var(--text-muted);">Choose a target domain, generate or edit the email, then send through your configured SMTP account.</p></div></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.75rem;">
+                    <select id="campaign-audience-list" class="form-select"><option value="">Send to domain below</option></select>
+                    <input id="campaign-domain" class="form-input" placeholder="Target email domain (e.g. example.com)">
+                    <input id="campaign-from" class="form-input" placeholder="Verified sender email">
+                    <input id="campaign-reply-to" class="form-input" placeholder="Reply-To email (optional)">
+                    <input id="campaign-name" class="form-input" placeholder="Campaign name">
+                    <input id="campaign-subject" class="form-input" placeholder="Email subject">
+                </div>
+                <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;">
+                    <input id="campaign-industry" class="form-input" placeholder="Industry">
+                    <select id="campaign-tone" class="form-select"><option>EXECUTIVE</option><option>TECHNICAL</option><option>SALES</option></select>
+                    <input id="campaign-topic" class="form-input" placeholder="Topic">
+                    <input id="campaign-cta" class="form-input" placeholder="Call to action">
+                    <select id="campaign-source-asset" class="form-select"><option value="">Select brochure/catalog source</option></select>
+                    <button id="campaign-generate" class="btn btn-secondary" type="button">Generate AI Draft</button>
+                </div>
+                <p style="font-size:.75rem;color:var(--text-muted);">Draft facts come from the selected asset. Use {{firstName}}, {{lastName}}, {{company}}, and {{senderName}} for recipient-specific personalization.</p>
+                <textarea id="campaign-content" class="form-input" rows="12" style="margin-top:.75rem" placeholder="Email HTML content"></textarea>
+                <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-top:.75rem;">
+                    <label class="form-label">Optional attachment (max 10 MiB) <input id="campaign-attachment" type="file" class="form-input"></label>
+                    <button id="campaign-send" class="btn btn-primary" type="button">Send Campaign</button>
+                </div>
+                <div id="campaign-result" style="margin-top:.75rem"></div>
+            </section>
+        </section>
+
+        <!-- ============================================== -->
+        <section id="view-proposals" style="display:none;padding:2rem;max-width:1200px;margin:auto">
+          <div style="display:flex;justify-content:space-between"><div><h1>Proposals</h1><p>Generate and track client proposals</p></div><button id="proposal-new" class="btn btn-primary">Create proposal</button></div>
+          <div id="proposal-pipeline"></div><div id="proposal-form" style="display:none;padding:1rem">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem"><input id="p-company" class="form-input" placeholder="Client company"><input id="p-contact" class="form-input" placeholder="Contact person"><input id="p-email" class="form-input" placeholder="Contact email"><input id="p-industry" class="form-input" placeholder="Industry"><input id="p-usecase" class="form-input" placeholder="Use case"><input id="p-services" class="form-input" placeholder="Services, comma separated"><input id="p-budget" class="form-input" type="number" placeholder="Contract value"><input id="p-timeline" class="form-input" placeholder="Timeline"></div>
+          <button id="p-generate" class="btn btn-secondary">Generate AI draft</button><button id="p-save" class="btn btn-primary">Save proposal</button><textarea id="p-content" class="form-input" rows="14" placeholder="Proposal content"></textarea></div><div id="proposal-list"></div>
+        </section>
+        <!-- VIEW 2: DOCUMENT INTAKE COCKPIT                -->
+        <!-- ============================================== -->
+        <section id="view-dashboard" style="display: none;">
+
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <span class="stat-label">Total Documents</span>
+                    <span id="stat-total" class="stat-value">0</span>
+                    <span class="stat-subtext">Across active tenant</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Processed (Passed)</span>
+                    <span id="stat-processed" class="stat-value" style="color: var(--status-success);">0</span>
+                    <span class="stat-subtext">Confidence &gt;= 90% threshold</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Exceptions / Flagged</span>
+                    <span id="stat-exception" class="stat-value" style="color: var(--status-warning);">0</span>
+                    <span class="stat-subtext">Needs human verification</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Avg AI Confidence</span>
+                    <span id="stat-confidence" class="stat-value" style="color: var(--accent-blue);">0.0%</span>
+                    <span class="stat-subtext">Apache Tika extraction score</span>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+
+                <!-- Left Column: Document Intake Form -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Document Intake</h2>
+                        <span class="badge badge-info">Zero-Trust Pipeline</span>
+                    </div>
+
+                    <!-- Dropzone -->
+                    <div id="dropzone" class="dropzone">
+                        <div class="dropzone-icon">📄</div>
+                        <div class="dropzone-title">Click or drag document here</div>
+                        <div class="dropzone-desc">Supports PDF, PNG, JPG, TIFF, TXT (up to 20MB)</div>
+                        <input type="file" id="cockpit-file-input" style="display: none;">
+                    </div>
+
+                    <!-- File preview -->
+                    <div id="cockpit-file-preview" class="file-preview" style="display: none;">
+                        <div>
+                            <div id="cockpit-file-name" style="font-weight: 600;">invoice.pdf</div>
+                            <div id="cockpit-file-size" style="color: var(--text-muted); font-size: 0.75rem;">1.2 MB</div>
+                        </div>
+                        <button type="button" id="cockpit-remove-file" class="btn btn-secondary btn-sm">✕</button>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label">Classification</label>
+                        <select id="cockpit-doc-type" class="form-select">
+                            <option value="INVOICE">INVOICE (Vendor Bill)</option>
+                            <option value="RECEIPT">RECEIPT (Expense)</option>
+                            <option value="CONTRACT">CONTRACT (Agreement)</option>
+                            <option value="FINANCIAL_STATEMENT">FINANCIAL STATEMENT</option>
+                            <option value="TAX_FORM">TAX FORM</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Ingestion Source</label>
+                        <input type="text" id="cockpit-source" class="form-input" value="Direct Upload">
+                    </div>
+
+                    <button id="cockpit-upload-btn" class="btn btn-primary btn-block" disabled style="margin-top: 1.25rem;">
+                        Upload &amp; Process with AI Intake
+                    </button>
+                </div>
+
+                <!-- Right Column: Documents Explorer Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Ingested Documents</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Real-time extracted entities and zero-trust validation status</p>
+                        </div>
+                        <div style="display: flex; gap: 0.6rem; align-items: center;">
+                            <select id="cockpit-status-filter" class="form-select" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.8rem;">
+                                <option value="">All Statuses</option>
+                                <option value="PROCESSED">PROCESSED Only</option>
+                                <option value="EXCEPTION">EXCEPTION Only</option>
+                            </select>
+                            <button id="cockpit-refresh-btn" class="btn btn-secondary btn-sm">↻ Refresh</button>
+                        </div>
+                    </div>
+
+                    <!-- Search Filter Bar -->
+                    <div style="margin-bottom: 1rem;">
+                        <input type="text" id="cockpit-search-input" class="form-input" placeholder="Search by filename, uploader, type...">
+                    </div>
+
+                    <!-- Table -->
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Confidence</th>
+                                    <th>Uploaded At</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cockpit-docs-body">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                        Loading documents...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Edit Postman Variables -->
+    <div id="vars-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">Postman Collection Variables</h3>
+                <button id="close-vars-modal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+                    These variables mirror the Postman collection environment and are automatically resolved in request URLs, headers, and request bodies.
+                </p>
+                <div id="vars-form-fields">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="reset-vars-btn" class="btn btn-secondary btn-sm">Reset to Defaults</button>
+                <button id="save-vars-btn" class="btn btn-primary btn-sm">Save Variables</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Collection Runner Progress -->
+    <div id="runner-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 680px;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">Collection Test Runner</h3>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Executing Postman collection requests in sequence</div>
+                </div>
+                <button id="close-runner-modal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="runner-steps-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Populated dynamically during test execution -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-runner-btn" class="btn btn-secondary btn-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Document Details Inspector -->
+    <div id="doc-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-doc-name" style="font-size: 1.15rem; font-weight: 700;">Document Details</h3>
+                    <code id="modal-doc-id" style="font-size: 0.75rem; color: var(--accent-blue);">uuid-here</code>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="modal-doc-status" class="badge badge-success">PROCESSED</span>
+                    <button id="close-doc-modal" class="close-btn">&times;</button>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.6rem;">
+                    Original Document
+                </h4>
+                <div id="modal-original-preview" style="margin-bottom: 1.25rem;">
+                    <div id="modal-preview-message" style="color: var(--text-muted); font-size: 0.85rem;">Loading original document...</div>
+                    <iframe id="modal-preview-frame" title="Original uploaded document" style="display: none; width: 100%; height: 480px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: white;"></iframe>
+                    <a id="modal-download-link" class="btn btn-secondary btn-sm" style="display: none; margin-top: 0.75rem;">Download original file</a>
+                </div>
+                <div id="modal-doc-flag" class="badge badge-warning" style="display: none; width: 100%; border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.85rem; font-weight: 500;">
+                    Review alert
+                </div>
+
+                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.6rem;">
+                    Extracted Semantic Entities
+                </h4>
+                <div id="modal-fields-grid" class="fields-grid"></div>
+
+                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin: 1.25rem 0 0.5rem 0;">
+                    Apache Tika Extracted Text
+                </h4>
+                <pre id="modal-extracted-text" class="code-box"></pre>
+
+                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin: 1.25rem 0 0.5rem 0;">
+                    Complete Response JSON
+                </h4>
+                <pre id="modal-raw-json" class="code-box"></pre>
+            </div>
+
+            <div class="modal-footer">
+                <button id="copy-modal-json" class="btn btn-secondary btn-sm">📋 Copy JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Dedicated User Authentication (Login & Register) -->
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <div>
+                    <h3 id="auth-modal-title" style="font-size: 1.15rem; font-weight: 700; color: #ffffff;">Sign In to Account</h3>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Tenant-scoped secure zero-trust session</div>
+                </div>
+                <button id="close-auth-modal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="padding-top: 1rem;">
+                <div class="auth-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+                    <button id="tab-auth-login" class="sub-tab active" style="flex: 1; text-align: center; font-size: 0.9rem; padding: 0.6rem;">Sign In</button>
+                    <button id="tab-auth-register" class="sub-tab" style="flex: 1; text-align: center; font-size: 0.9rem; padding: 0.6rem;">Register User</button>
+                </div>
+
+                <!-- Sign In Form -->
+                <form id="cockpit-login-form">
+                    <div class="form-group">
+                        <label class="form-label">Tenant ID (UUID)</label>
+                        <input type="text" id="auth-login-tenant" class="form-input" required 
+                               value="11111111-1111-1111-1111-111111111111">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" id="auth-login-email" class="form-input" required 
+                               value="admin@example.com" placeholder="name@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="auth-login-password" class="form-input" required 
+                               value="ChangeThisLocalPassword123!" placeholder="••••••••••••">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.25rem;">
+                        Sign In
+                    </button>
+                    <div style="margin-top: 0.75rem; text-align: center;">
+                        <button type="button" id="auth-demo-fill-btn" class="btn btn-secondary btn-sm" style="width: 100%;">
+                            ⚡ Autofill Local Admin Credentials
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Register Form -->
+                <form id="cockpit-register-form" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Tenant ID (UUID)</label>
+                        <input type="text" id="auth-reg-tenant" class="form-input" required 
+                               value="11111111-1111-1111-1111-111111111111">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Display Name / Full Name</label>
+                        <input type="text" id="auth-reg-name" class="form-input" required 
+                               placeholder="e.g. Local Admin">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Work Email</label>
+                        <input type="email" id="auth-reg-email" class="form-input" required 
+                               placeholder="admin@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password (min 12 characters)</label>
+                        <input type="password" id="auth-reg-password" class="form-input" required 
+                               minlength="12" maxlength="72" placeholder="At least 12 characters">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.25rem;">
+                        Create Enterprise Account
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/sentry-api/:path*",
+      "destination": "http://147.93.108.99:9090/:path*"
+    },
+    {
+      "source": "/incidents/:path*",
+      "destination": "http://147.93.108.99:9090/incidents/:path*"
+    },
+    {
+      "source": "/live_frame/:path*",
+      "destination": "http://147.93.108.99:9090/live_frame/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

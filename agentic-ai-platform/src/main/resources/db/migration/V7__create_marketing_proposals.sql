@@ -1,0 +1,21 @@
+CREATE TABLE mkt_proposals (
+    id BINARY(16) NOT NULL PRIMARY KEY,
+    tenant_id BINARY(16) NOT NULL,
+    client_company VARCHAR(200) NOT NULL,
+    contact_name VARCHAR(160) NOT NULL,
+    contact_email VARCHAR(320) NOT NULL,
+    industry VARCHAR(160) NOT NULL,
+    use_case VARCHAR(1000) NOT NULL,
+    services_json TEXT NOT NULL,
+    budget DECIMAL(15,2) NOT NULL,
+    timeline VARCHAR(160) NOT NULL,
+    content_json LONGTEXT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    win_probability INT NOT NULL DEFAULT 25,
+    next_action VARCHAR(500),
+    follow_up_date DATE,
+    sent_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    INDEX idx_mkt_proposals_tenant_updated (tenant_id, updated_at)
+);

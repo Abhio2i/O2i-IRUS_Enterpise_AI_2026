@@ -1,0 +1,2 @@
+INSERT IGNORE INTO dms_tenants (id, name)
+VALUES (UUID_TO_BIN('11111111-1111-1111-1111-111111111111'), 'Local Development');

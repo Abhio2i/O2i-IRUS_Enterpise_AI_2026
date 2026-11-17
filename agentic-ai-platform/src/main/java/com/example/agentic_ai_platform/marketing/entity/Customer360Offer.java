@@ -1,0 +1,6 @@
+package com.example.agentic_ai_platform.marketing.entity;
+import jakarta.persistence.*; import java.time.Instant; import java.util.UUID;
+@Entity @Table(name="mkt_customer_360_offers") public class Customer360Offer {
+ @Id private UUID id; @Column(name="tenant_id",nullable=false) private UUID tenantId; @Column(name="account_id",nullable=false) private UUID accountId; @Column(nullable=false,length=200) private String title; @Column(length=1000) private String rationale; @Column(name="offer_type",nullable=false,length=40) private String offerType; @Column(nullable=false,length=32) private String status; @Column(name="created_at",nullable=false) private Instant createdAt; protected Customer360Offer(){}
+ public Customer360Offer(UUID id,UUID tenant,UUID account,com.example.agentic_ai_platform.marketing.dto.Customer360OfferRequest r){this.id=id;tenantId=tenant;accountId=account;title=r.title();rationale=r.rationale();offerType=r.offerType();status=r.status();createdAt=Instant.now();} public UUID getId(){return id;} public String getTitle(){return title;} public String getRationale(){return rationale;} public String getOfferType(){return offerType;} public String getStatus(){return status;} public Instant getCreatedAt(){return createdAt;}
+}

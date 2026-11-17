@@ -1,0 +1,4 @@
+/sentry-api/* http://147.93.108.99:9090/:splat 200
+/incidents/* http://147.93.108.99:9090/incidents/:splat 200
+/live_frame/* http://147.93.108.99:9090/live_frame/:splat 200
+/* /index.html 200

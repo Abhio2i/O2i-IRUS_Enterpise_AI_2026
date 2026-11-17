@@ -1,0 +1,1272 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { createCampaign } from '../../store/marketingSlice';
+import { addAuditLog } from '../../store/governanceSlice';
+import {
+  Mail, CheckCircle, ShieldCheck, Send, Eye,
+  Globe, RefreshCw, AlertCircle, FileText, Trash2, ArrowRight, Sparkles, Server, Users, Zap
+} from 'lucide-react';
+import {
+  getContactsByDomain,
+  generateAiEmailDraft,
+  sendBulkCampaign,
+  getCampaignStatus,
+  listEmailTemplates,
+  createEmailTemplate,
+  deleteEmailTemplate,
+  getSenderConfig,
+  listCustomerLists,
+  getCustomerListContacts,
+  listCampaigns,
+  listMarketingAssets,
+} from '../../services/apiClient';
+
+export const ContentStudioPage = () => {
+  const dispatch = useDispatch();
+  const reduxCampaigns = useSelector((s) => s.marketing.campaigns || []);
+  const brand = useSelector((s) => s.marketing.brandGuidelines);
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState('Sender');
+  const [backendCampaigns, setBackendCampaigns] = useState([]);
+
+  // Audience targeting state
+  const [audienceType, setAudienceType] = useState('DOMAIN'); // 'DOMAIN' | 'LIST' | 'DIRECT'
+  const [targetDomain, setTargetDomain] = useState('volvo.se');
+  const [selectedListId, setSelectedListId] = useState('');
+  const [savedLists, setSavedLists] = useState([]);
+  const [matchedContacts, setMatchedContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [directEmail, setDirectEmail] = useState('');
+  const [directFirstName, setDirectFirstName] = useState('');
+  const [directLastName, setDirectLastName] = useState('');
+  const [directCompany, setDirectCompany] = useState('Oxygen to Innovation');
+
+  // Marketing Assets for Brochure / Catalog Grounding
+  const [marketingAssets, setMarketingAssets] = useState([]);
+  const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [loadingAssets, setLoadingAssets] = useState(false);
+
+  const emailSubjectRef = useRef(null);
+  const emailBodyRef = useRef(null);
+
+  const insertTokenBody = (token) => {
+    const el = emailBodyRef.current;
+    if (el) {
+      const start = el.selectionStart || 0;
+      const end = el.selectionEnd || 0;
+      const val = emailBodyHtml;
+      const next = val.substring(0, start) + token + val.substring(end);
+      setEmailBodyHtml(next);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + token.length, start + token.length);
+      }, 0);
+    } else {
+      setEmailBodyHtml(prev => prev + token);
+    }
+  };
+
+  const insertTokenSubject = (token) => {
+    const el = emailSubjectRef.current;
+    if (el) {
+      const start = el.selectionStart || 0;
+      const end = el.selectionEnd || 0;
+      const val = emailSubject;
+      const next = val.substring(0, start) + token + val.substring(end);
+      setEmailSubject(next);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + token.length, start + token.length);
+      }, 0);
+    } else {
+      setEmailSubject(prev => prev + ' ' + token);
+    }
+  };
+
+  // AI Generation inputs
+  const [aiIndustry, setAiIndustry] = useState('Automotive');
+  const [aiTone, setAiTone] = useState('EXECUTIVE');
+  const [aiTopic, setAiTopic] = useState('ERP Modernisation & AI Supply Chain Integration');
+  const [aiCta, setAiCta] = useState('Schedule a 15-min Architecture Review');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Email Composer state
+  const [campaignName, setCampaignName] = useState('Oxygen to Innovation - Executive Outreach');
+  const [emailSubject, setEmailSubject] = useState('A practical path to faster exception settlement | Oxygen to Innovation');
+  const [emailBodyHtml, setEmailBodyHtml] = useState(
+`<p>Hi {{firstName}},</p>
+<p>Organizations across the industry are under growing pressure to accelerate throughput, strengthen operational resilience, and maintain real-time visibility across complex business workflows.</p>
+
+<p>At <strong>Oxygen to Innovation</strong>, our Enterprise AI Platform connects your operational workflows directly with intelligent document intake, automated compliance checks, and enterprise-grade exception routing. By verifying incoming files against corporate business rules in real time, teams eliminate repetitive manual data re-entry while maintaining strict audit governance.</p>
+
+<p>For {{company}}, a practical modernization engagement focuses on four high-impact areas:</p>
+<ul>
+  <li><strong>ERP & Core Touchpoints:</strong> Bi-directional synchronization minimizing manual transcription latency.</li>
+  <li><strong>Autonomous Exception Routing:</strong> Intelligent exception queues with customizable approval controls and audit trails.</li>
+  <li><strong>Predictive Analytics:</strong> Real-time tracking of operational cycle times, exception frequency, and SLA performance.</li>
+  <li><strong>Enterprise Security:</strong> Role-based access control, SOC2/ISO compliance, and complete data residency.</li>
+</ul>
+
+<p>We have prepared a targeted solution brief and reference architecture outlining a focused, phased rollout for engineering and operational leadership.</p>
+
+<p><a href="https://o2i.tech"><strong>Schedule a 15-Minute Architecture Review</strong></a>, or reply with a convenient time that suits your calendar this week.</p>
+
+<p>Best regards,<br/><strong>{{senderName}}</strong><br/>Oxygen to Innovation</p>
+<p><small style="color: #6b7280;">If this topic is outside your current mandate, reply with your preferences and we will update our records immediately.</small></p>`
+  );
+  const [fromEmail, setFromEmail] = useState('');
+  const [defaultSender, setDefaultSender] = useState('');
+  const [allowedSenders, setAllowedSenders] = useState([]);
+  const [senderName, setSenderName] = useState('Oxygen to Innovation');
+  const [replyTo, setReplyTo] = useState('ab2@o2i.tech');
+  const [attachmentFile, setAttachmentFile] = useState(null);
+
+  // Dispatch / Sending state
+  const [isSending, setIsSending] = useState(false);
+  const [activeCampaignResult, setActiveCampaignResult] = useState(null);
+  const [trackingStatus, setTrackingStatus] = useState(null);
+
+  // Templates state
+  const [templates, setTemplates] = useState([]);
+  const [_loadingTemplates, setLoadingTemplates] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+
+  // Notices
+  const [notice, setNotice] = useState('');
+  const [noticeType, setNoticeType] = useState('success');
+
+  const showFeedback = (msg, type = 'success') => {
+    setNotice(msg);
+    setNoticeType(type);
+    setTimeout(() => setNotice(''), 4500);
+  };
+
+  // Fetch contacts matching domain
+  const fetchDomainContacts = async (domainToSearch) => {
+    if (!domainToSearch || !domainToSearch.trim()) return;
+    setLoadingContacts(true);
+    try {
+      const data = await getContactsByDomain(domainToSearch);
+      setMatchedContacts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Domain search notice:', err.message);
+      setMatchedContacts([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  // Fetch contacts from a saved list
+  const fetchListContacts = async (listId) => {
+    if (!listId) {
+      setMatchedContacts([]);
+      return;
+    }
+    setLoadingContacts(true);
+    try {
+      const data = await getCustomerListContacts(listId);
+      setMatchedContacts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('List contacts notice:', err.message);
+      setMatchedContacts([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  // Load saved lists
+  const fetchSavedLists = async () => {
+    try {
+      const data = await listCustomerLists();
+      if (Array.isArray(data)) {
+        setSavedLists(data);
+      }
+    } catch (err) {
+      console.warn('Saved lists fetch notice:', err.message);
+    }
+  };
+
+  // Load tenant marketing assets (brochures & catalogs)
+  const fetchMarketingAssets = async () => {
+    setLoadingAssets(true);
+    try {
+      const data = await listMarketingAssets();
+      const assets = Array.isArray(data) ? data : [];
+      setMarketingAssets(assets);
+      if (assets.length > 0) {
+        setSelectedAssetId(prev => prev || assets[0].id);
+      }
+    } catch (err) {
+      console.warn('Marketing assets fetch notice:', err.message);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  // Load templates
+  const fetchTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const data = await listEmailTemplates();
+      setTemplates(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Templates fetch notice:', err.message);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  // Load backend campaigns
+  const fetchCampaignsList = async () => {
+    try {
+      const data = await listCampaigns();
+      if (Array.isArray(data)) setBackendCampaigns(data);
+    } catch {}
+  };
+
+  const campaignsList = [
+    ...backendCampaigns,
+    ...reduxCampaigns.filter(rc => !backendCampaigns.some(bc => (bc.campaignId && bc.campaignId === rc.id) || bc.id === rc.id)),
+  ];
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchDomainContacts(targetDomain);
+    fetchTemplates();
+    fetchSavedLists();
+    fetchMarketingAssets();
+    fetchCampaignsList();
+    getSenderConfig()
+      .then(cfg => {
+        if (cfg?.defaultSender) {
+          setDefaultSender(cfg.defaultSender);
+          setAllowedSenders(cfg.allowedSenders || [cfg.defaultSender]);
+          setFromEmail(prev => prev || cfg.defaultSender);
+        }
+      })
+      .catch(() => {});
+  }, []); // intentionally run once on mount
+
+  useEffect(() => {
+    if (audienceType === 'LIST') {
+      if (selectedListId) {
+        fetchListContacts(selectedListId);
+      } else {
+        setMatchedContacts([]);
+      }
+    } else {
+      fetchDomainContacts(targetDomain);
+    }
+  }, [audienceType, selectedListId]);
+
+  // Check if routed from Customer Lists or Proposals
+  useEffect(() => {
+    const preselectedListId = localStorage.getItem('selectedCampaignListId');
+    const preselectedListName = localStorage.getItem('selectedCampaignListName');
+    if (preselectedListId) {
+      setActiveTab('Sender');
+      setAudienceType('LIST');
+      setSelectedListId(preselectedListId);
+      fetchListContacts(preselectedListId);
+      if (preselectedListName) {
+        setCampaignName(`${preselectedListName} Outreach Campaign`);
+      }
+      localStorage.removeItem('selectedCampaignListId');
+      localStorage.removeItem('selectedCampaignListName');
+    }
+
+    const proposalCampaignRaw = localStorage.getItem('selectedProposalCampaign');
+    if (proposalCampaignRaw) {
+      try {
+        const prop = JSON.parse(proposalCampaignRaw);
+        setActiveTab('Sender');
+        if (prop.campaignName) setCampaignName(prop.campaignName);
+        if (prop.subject) setEmailSubject(prop.subject);
+        if (prop.bodyHtml) setEmailBodyHtml(prop.bodyHtml);
+        if (prop.domain) {
+          setAudienceType('DOMAIN');
+          setTargetDomain(prop.domain);
+          fetchDomainContacts(prop.domain);
+        }
+        showFeedback(`Proposal for ${prop.company} loaded into Email Sender!`, 'success');
+      } catch (e) {}
+      localStorage.removeItem('selectedProposalCampaign');
+    }
+  }, [savedLists]);
+
+  // Handle AI Email Generation
+  const handleGenerateAi = async () => {
+    if (!selectedAssetId) {
+      showFeedback('Please select a brochure or catalog as grounding source before generating.', 'error');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const res = await generateAiEmailDraft({
+        targetDomain,
+        industry: aiIndustry,
+        tone: aiTone,
+        topic: aiTopic,
+        callToAction: aiCta,
+        prompt: aiPrompt,
+        sourceAssetId: selectedAssetId,
+      });
+
+      if (res.subject || res.subjectLine) setEmailSubject(res.subject || res.subjectLine);
+      if (res.bodyHtml || res.contentHtml) setEmailBodyHtml(res.bodyHtml || res.contentHtml);
+      if (res.campaignName) setCampaignName(res.campaignName);
+
+      showFeedback(`AI drafted personalized email grounded in selected brochure/catalog.`);
+    } catch (err) {
+      showFeedback(`AI generation failed: ${err.message}`, 'error');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle Bulk Campaign Dispatch
+  const handleSendBulk = async (e) => {
+    e.preventDefault();
+    if (audienceType === 'DIRECT') {
+      if (!directEmail || !directEmail.trim() || !directEmail.includes('@')) {
+        showFeedback('Please enter a valid recipient email address for test send.', 'error');
+        return;
+      }
+    } else if (audienceType === 'DOMAIN' && (!targetDomain || !targetDomain.trim())) {
+      showFeedback('Please enter a target customer domain.', 'error');
+      return;
+    } else if (audienceType === 'LIST' && !selectedListId) {
+      showFeedback('Please select a saved customer list.', 'error');
+      return;
+    } else if (matchedContacts.length === 0) {
+      const msg = audienceType === 'DOMAIN'
+        ? `No verified contacts found for domain "${targetDomain}". Import contacts first, or switch to "⚡ Test / Single" tab to send immediately!`
+        : `No contacts found in the selected saved list. Switch to "⚡ Test / Single" tab to test immediately!`;
+      showFeedback(msg, 'error');
+      return;
+    }
+
+    if (defaultSender && fromEmail && !allowedSenders.some(s => s.toLowerCase() === fromEmail.trim().toLowerCase())) {
+      showFeedback(`Sender email "${fromEmail}" must match backend env (SMTP_FROM: ${defaultSender})`, 'error');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const selectedListName = savedLists.find(l => l.id === selectedListId)?.name || 'Saved List';
+      const effectiveFrom = fromEmail.trim() || defaultSender || 'verified-sender@example.com';
+      const effectiveCampaignName = campaignName.trim() || (audienceType === 'DIRECT' ? `Direct Test to ${directEmail.trim()}` : 'Executive Campaign');
+      const result = await sendBulkCampaign({
+        campaignName: effectiveCampaignName,
+        targetDomain: audienceType === 'DOMAIN' ? targetDomain.trim() : undefined,
+        targetListId: audienceType === 'LIST' ? selectedListId : undefined,
+        directEmail: audienceType === 'DIRECT' ? directEmail.trim() : undefined,
+        directFirstName: audienceType === 'DIRECT' ? directFirstName.trim() : undefined,
+        directLastName: audienceType === 'DIRECT' ? directLastName.trim() : undefined,
+        directCompany: audienceType === 'DIRECT' ? directCompany.trim() : undefined,
+        subject: emailSubject,
+        contentHtml: emailBodyHtml,
+        fromEmail: effectiveFrom,
+        senderName,
+        replyTo,
+        variables: ['firstName', 'lastName', 'company', 'senderName', 'email'],
+        attachment: attachmentFile,
+      });
+
+      setActiveCampaignResult(result);
+      fetchCampaignsList();
+      const count = result.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length);
+      showFeedback(`Email "${effectiveCampaignName}" accepted — dispatching to ${count} recipient(s) via SMTP!`);
+
+      const channelDesc = audienceType === 'DIRECT'
+        ? `Direct Test Email (${directEmail})`
+        : audienceType === 'DOMAIN'
+          ? `Bulk Domain Email (@${targetDomain})`
+          : `Bulk List Email (${selectedListName})`;
+      const targetDesc = audienceType === 'DIRECT'
+        ? `${directEmail} (${directFirstName || 'Valued Customer'} @ ${directCompany || 'Enterprise'})`
+        : audienceType === 'DOMAIN'
+          ? `${targetDomain} Verified Contacts (${matchedContacts.length})`
+          : `${selectedListName} (${matchedContacts.length} Contacts)`;
+
+      dispatch(createCampaign({
+        id: result.campaignId || `CMP-${Math.floor(100 + Math.random() * 900)}`,
+        title: campaignName,
+        channel: channelDesc,
+        targetSegment: targetDesc,
+        objective: aiTopic,
+        contentPreview: emailSubject,
+        status: 'DEPLOYED',
+        brandCompliance: { score: 98, status: 'PASSED', voiceCheck: aiTone, bannedWordsDetected: 0 },
+        metrics: { predictedCTR: '6.4%', targetReach: `${matchedContacts.length} Contacts` },
+        createdAt: 'Just now',
+      }));
+
+      dispatch(addAuditLog({
+        id: `AUD-${Math.floor(1000 + Math.random() * 9000)}`,
+        actor: 'user.marketing-operator',
+        action: 'DOMAIN_BULK_EMAIL_DISPATCHED',
+        endpoint: '/api/marketing/campaigns/send-bulk',
+        riskTier: 'MEDIUM',
+        model: 'SMTP Gateway',
+        tokens: 840,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC',
+        details: `Dispatched campaign "${campaignName}" to ${matchedContacts.length} contacts (${targetDesc}).`,
+      }));
+
+      // Poll campaign status once
+      if (result.campaignId) {
+        setTimeout(async () => {
+          try {
+            const status = await getCampaignStatus(result.campaignId);
+            setTrackingStatus(status);
+          } catch {}
+        }, 1500);
+      }
+    } catch (err) {
+      showFeedback(`Campaign dispatch failed: ${err.message}`, 'error');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Handle Save Template
+  const handleSaveTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    try {
+      const created = await createEmailTemplate({
+        name: newTemplateName.trim(),
+        subject: emailSubject,
+        contentHtml: emailBodyHtml,
+        industry: aiIndustry,
+        tone: aiTone,
+      });
+      setTemplates(prev => [created, ...prev]);
+      setShowSaveTemplateModal(false);
+      setNewTemplateName('');
+      showFeedback(`Saved template "${created.name}".`);
+    } catch (err) {
+      showFeedback(`Could not save template: ${err.message}`, 'error');
+    }
+  };
+
+  // Handle Delete Template
+  const handleDeleteTemplate = async (templateId, name) => {
+    if (!window.confirm(`Delete template "${name}"?`)) return;
+    try {
+      await deleteEmailTemplate(templateId);
+      setTemplates(prev => prev.filter(t => t.id !== templateId));
+      showFeedback('Template deleted.');
+    } catch (err) {
+      showFeedback(`Delete failed: ${err.message}`, 'error');
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title-block">
+          <div className="page-tag">Marketing · Email Sender & Bulk Outreach</div>
+          <h2>Email Sender — Domain Blast & Campaign Manager</h2>
+          <p>
+            Target specific customer domains (e.g. <code>@volvo.se</code>), generate AI-personalized email drafts,
+            and send bulk SMTP campaigns via <code>/api/marketing/campaigns/send-bulk</code>.
+            Requires <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USERNAME</code>, <code>SMTP_PASSWORD</code> and <code>SMTP_FROM</code> configured on the server.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className={`btn btn-sm ${activeTab === 'Sender' ? 'btn-solid' : 'btn-ghost'}`}
+            onClick={() => setActiveTab('Sender')}
+          >
+            <Mail size={13} /> Email Sender
+          </button>
+          <button
+            className={`btn btn-sm ${activeTab === 'Campaigns' ? 'btn-solid' : 'btn-ghost'}`}
+            onClick={() => {
+              setActiveTab('Campaigns');
+              fetchCampaignsList();
+            }}
+          >
+            <Send size={13} /> Campaigns ({campaignsList.length})
+          </button>
+          <button
+            className={`btn btn-sm ${activeTab === 'Templates' ? 'btn-solid' : 'btn-ghost'}`}
+            onClick={() => setActiveTab('Templates')}
+          >
+            <FileText size={13} /> Email Templates ({templates.length})
+          </button>
+        </div>
+      </div>
+
+      {/* SMTP Configuration Notice */}
+      <div style={{
+        padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+        color: '#92400e',
+      }}>
+        <Server size={13} style={{ flexShrink: 0 }} />
+        <span>
+          <strong>SMTP & Verified Senders:</strong> Set <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USERNAME</code>, <code>SMTP_PASSWORD</code>, <code>SMTP_FROM</code> and optional <code>SMTP_ALLOWED_FROM</code> in your server environment. The entered From Email must match one of your configured verified addresses.
+        </span>
+      </div>
+
+      {notice && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 8, fontSize: 12.5, marginBottom: 16,
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: noticeType === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${noticeType === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          color: noticeType === 'success' ? '#16a34a' : '#dc2626',
+        }}>
+          {noticeType === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+          {notice}
+        </div>
+      )}
+
+      {/* ─── TAB: EMAIL SENDER ─── */}
+      {activeTab === 'Sender' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20 }}>
+          {/* LEFT: Target Domain & AI Generator Settings */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* 1. Target Audience Box (Domain, Saved List, or Direct Test) */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">
+                  {audienceType === 'DOMAIN' ? <Globe size={14} /> : audienceType === 'LIST' ? <Users size={14} /> : <Zap size={14} />} Target Audience
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button
+                    type="button"
+                    className={`btn btn-xs ${audienceType === 'DOMAIN' ? 'btn-solid' : 'btn-ghost'}`}
+                    style={audienceType === 'DOMAIN' ? { background: 'var(--brand-primary, #2563eb)', color: '#fff', fontSize: 11, padding: '2px 8px' } : { fontSize: 11, padding: '2px 8px' }}
+                    onClick={() => setAudienceType('DOMAIN')}
+                  >
+                    Domain
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-xs ${audienceType === 'LIST' ? 'btn-solid' : 'btn-ghost'}`}
+                    style={audienceType === 'LIST' ? { background: 'var(--brand-primary, #2563eb)', color: '#fff', fontSize: 11, padding: '2px 8px' } : { fontSize: 11, padding: '2px 8px' }}
+                    onClick={() => {
+                      setAudienceType('LIST');
+                      if (!selectedListId && savedLists.length > 0) {
+                        setSelectedListId(savedLists[0].id);
+                      }
+                    }}
+                  >
+                    Saved List
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-xs ${audienceType === 'DIRECT' ? 'btn-solid' : 'btn-ghost'}`}
+                    style={audienceType === 'DIRECT' ? { background: '#10b981', color: '#fff', fontSize: 11, padding: '2px 8px' } : { fontSize: 11, padding: '2px 8px' }}
+                    onClick={() => setAudienceType('DIRECT')}
+                  >
+                    ⚡ Test / Single
+                  </button>
+                </div>
+              </div>
+
+              {audienceType === 'DIRECT' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11 }}>Recipient Email (Direct Test)</label>
+                    <input
+                      type="email"
+                      className="input"
+                      placeholder="e.g. test@company.com or your-email@gmail.com"
+                      value={directEmail}
+                      onChange={(e) => setDirectEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: 11 }}>First Name ({`{{firstName}}`})</label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. Rahul"
+                        value={directFirstName}
+                        onChange={(e) => setDirectFirstName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: 11 }}>Last Name ({`{{lastName}}`})</label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. Sharma"
+                        value={directLastName}
+                        onChange={(e) => setDirectLastName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: 11 }}>Company ({`{{company}}`})</label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. Volvo Group"
+                        value={directCompany}
+                        onChange={(e) => setDirectCompany(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : audienceType === 'DOMAIN' ? (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. volvo.se"
+                    value={targetDomain}
+                    onChange={(e) => setTargetDomain(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => fetchDomainContacts(targetDomain)}
+                    disabled={loadingContacts}
+                    title="Refresh domain contacts"
+                  >
+                    <RefreshCw size={13} className={loadingContacts ? 'spin' : ''} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <select
+                    className="input"
+                    value={selectedListId}
+                    onChange={(e) => setSelectedListId(e.target.value)}
+                  >
+                    <option value="">-- Select Saved List ({savedLists.length}) --</option>
+                    {savedLists.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} ({l.contacts ?? l.count ?? 0} contacts)
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      fetchSavedLists();
+                      if (selectedListId) fetchListContacts(selectedListId);
+                    }}
+                    disabled={loadingContacts}
+                    title="Refresh saved lists"
+                  >
+                    <RefreshCw size={13} className={loadingContacts ? 'spin' : ''} />
+                  </button>
+                </div>
+              )}
+
+              <div style={{ padding: '10px 12px', borderRadius: 7, background: 'var(--bg-hover)', border: '1px solid var(--border-subtle)', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>Target Audience:</span>
+                  <span className="mono" style={{ fontWeight: 700, color: (audienceType === 'DIRECT' ? (directEmail ? '#16a34a' : '#f59e0b') : (matchedContacts.length > 0 ? '#16a34a' : '#ef4444')) }}>
+                    {audienceType === 'DIRECT' ? (directEmail ? '1 Direct Recipient' : 'Enter recipient') : `${matchedContacts.length} Contacts`}
+                  </span>
+                </div>
+                {audienceType === 'DIRECT' ? (
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+                    ⚡ Single test email will be sent directly to <strong>{directEmail || 'entered address'}</strong> with tokens replaced.
+                  </div>
+                ) : matchedContacts.length > 0 ? (
+                  <div style={{ maxHeight: 90, overflowY: 'auto', marginTop: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+                    {matchedContacts.map((c, i) => (
+                      <div key={c.id || i} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        • {c.email} ({c.firstName || 'Contact'} — {c.company || 'Enterprise'})
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>
+                    {audienceType === 'DOMAIN'
+                      ? `No contacts found with domain @${targetDomain}. Import them via Customer Lists, or click "⚡ Test / Single" above.`
+                      : (selectedListId ? 'No contacts found in this list. Click "⚡ Test / Single" above.' : 'Select a saved list above.')}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. AI Generator Tuning */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title"><Sparkles size={14} /> AI Grounding & Objective</div>
+                <span className="badge">Groq / Grounded</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Brochure / Catalog Asset Picker */}
+                <div>
+                  <label className="form-label" style={{ fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Grounding Brochure / Catalog *</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      style={{ padding: '0 4px', fontSize: 10, color: 'var(--brand-primary, #2563eb)' }}
+                      onClick={fetchMarketingAssets}
+                      disabled={loadingAssets}
+                      title="Refresh uploaded brochures & catalogs"
+                    >
+                      <RefreshCw size={10} className={loadingAssets ? 'spin' : ''} /> Refresh
+                    </button>
+                  </label>
+                  {marketingAssets.length > 0 ? (
+                    <select
+                      className="input"
+                      value={selectedAssetId}
+                      onChange={e => setSelectedAssetId(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Select a Brochure or Catalog ({marketingAssets.length}) --</option>
+                      {marketingAssets.map(asset => (
+                        <option key={asset.id} value={asset.id}>
+                          📄 {asset.originalFilename || asset.name} ({asset.type || 'ASSET'}{asset.folder ? ` • ${asset.folder}` : ''})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#b45309', background: 'rgba(245, 158, 11, 0.1)', padding: '6px 8px', borderRadius: 5, border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                      No brochures or catalogs found in tenant assets. Please upload one in <strong>Asset Library</strong> to ground AI drafts.
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: 11 }}>Target Industry</label>
+                  <select className="input" value={aiIndustry} onChange={e => setAiIndustry(e.target.value)}>
+                    <option>Automotive</option>
+                    <option>Logistics & Freight</option>
+                    <option>Financial Services</option>
+                    <option>Manufacturing</option>
+                    <option>Technology</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: 11 }}>Voice Tone</label>
+                  <select className="input" value={aiTone} onChange={e => setAiTone(e.target.value)}>
+                    <option value="EXECUTIVE">Executive / C-Suite (Authoritative)</option>
+                    <option value="TECHNICAL">Technical / Architecture Focus</option>
+                    <option value="VALUE">Value Proposition & ROI Focus</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: 11 }}>Campaign Topic</label>
+                  <input
+                    className="input"
+                    value={aiTopic}
+                    onChange={e => setAiTopic(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: 11 }}>Call To Action (CTA)</label>
+                  <input
+                    className="input"
+                    value={aiCta}
+                    onChange={e => setAiCta(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: 11 }}>Custom Prompt / Angle (Optional)</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    placeholder="e.g. Focus on our SAP integration, 30-day proof-of-concept, and enterprise security."
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    style={{ fontSize: 12, resize: 'vertical' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-solid btn-sm"
+                  style={{ background: '#6366f1', color: '#fff', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  onClick={handleGenerateAi}
+                  disabled={isGenerating}
+                >
+                  <Sparkles size={13} /> {isGenerating ? 'Drafting with Groq AI...' : 'Generate Personalized Pitch'}
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Brand Compliance Rulebook Preview */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title"><ShieldCheck size={14} /> Brand Safety Policy</div>
+                <span className="badge success">Enforced</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div><strong>Tone:</strong> {brand.tone}</div>
+                <div style={{ marginTop: 4 }}><strong>Merge tokens:</strong> <code>{`{{firstName}}`}</code>, <code>{`{{company}}`}</code></div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: Email Composer & Bulk Dispatcher */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="card-header">
+              <div>
+                <div className="card-title"><Mail size={15} /> Email Composer & Bulk Sender</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Sending to <strong>{matchedContacts.length}</strong> recipients ({audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List')}) via SMTP
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowSaveTemplateModal(true)}
+              >
+                Save as Template
+              </button>
+            </div>
+
+            <form onSubmit={handleSendBulk} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label className="form-label">Campaign Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={campaignName}
+                  onChange={e => setCampaignName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>From Email (Verified Sender)</span>
+                    <span style={{ fontSize: 10, color: 'var(--brand-primary, #2563eb)' }}>
+                      {defaultSender ? `BACKEND ENV: ${defaultSender}` : 'SMTP_FROM'}
+                    </span>
+                  </label>
+                  <input
+                    type="email"
+                    list="allowed-senders-list"
+                    className="input"
+                    value={fromEmail}
+                    onChange={e => setFromEmail(e.target.value)}
+                    placeholder={defaultSender ? defaultSender : 'Must match backend env (SMTP_FROM)'}
+                  />
+                  {allowedSenders.length > 0 && (
+                    <datalist id="allowed-senders-list">
+                      {allowedSenders.map(s => <option key={s} value={s} />)}
+                    </datalist>
+                  )}
+                  {defaultSender && (
+                    <div style={{
+                      fontSize: 11,
+                      marginTop: 4,
+                      color: allowedSenders.some(s => s.toLowerCase() === fromEmail.trim().toLowerCase()) || !fromEmail
+                        ? '#16a34a'
+                        : '#dc2626',
+                    }}>
+                      {allowedSenders.some(s => s.toLowerCase() === fromEmail.trim().toLowerCase())
+                        ? `✓ Matches backend verified env sender (${fromEmail})`
+                        : fromEmail
+                          ? `⚠ Address must match backend env (SMTP_FROM: ${defaultSender})`
+                          : `Defaulting to backend env: ${defaultSender}`}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">Sender Display Name</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={senderName}
+                    onChange={e => setSenderName(e.target.value)}
+                    placeholder="Oxygen to Innovation"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Reply-To Email</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={replyTo}
+                  onChange={e => setReplyTo(e.target.value)}
+                  placeholder="ab2@o2i.tech"
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Subject Line</label>
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                    <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Insert:</span>
+                    <button
+                      type="button"
+                      className="btn btn-xs"
+                      style={{ fontSize: 10, padding: '1px 6px', background: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 4 }}
+                      onClick={() => insertTokenSubject('{{company}}')}
+                      title="Insert Company token into Subject"
+                    >
+                      + {`{{company}}`}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs"
+                      style={{ fontSize: 10, padding: '1px 6px', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: 4 }}
+                      onClick={() => insertTokenSubject('{{firstName}}')}
+                      title="Insert First Name token into Subject"
+                    >
+                      + {`{{firstName}}`}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-xs"
+                      style={{ fontSize: 10, padding: '1px 6px', background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.25)', borderRadius: 4 }}
+                      onClick={() => insertTokenSubject('{{lastName}}')}
+                      title="Insert Last Name token into Subject"
+                    >
+                      + {`{{lastName}}`}
+                    </button>
+                  </div>
+                </div>
+                <input
+                  ref={emailSubjectRef}
+                  type="text"
+                  className="input"
+                  value={emailSubject}
+                  onChange={e => setEmailSubject(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Email Content (HTML & Tokens)</label>
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Click to Insert Token:</span>
+                    {[
+                      { token: '{{firstName}}', color: '#4f46e5', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.25)' },
+                      { token: '{{lastName}}', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)', border: 'rgba(2, 132, 199, 0.25)' },
+                      { token: '{{company}}', color: '#059669', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' },
+                      { token: '{{email}}', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.25)' },
+                      { token: '{{senderName}}', color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.1)', border: 'rgba(124, 58, 237, 0.25)' },
+                    ].map(item => (
+                      <button
+                        key={item.token}
+                        type="button"
+                        className="btn btn-xs"
+                        style={{
+                          fontSize: 10.5,
+                          padding: '2px 7px',
+                          color: item.color,
+                          background: item.bg,
+                          border: `1px solid ${item.border}`,
+                          borderRadius: 5,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => insertTokenBody(item.token)}
+                        title={`Click to insert ${item.token} at cursor position`}
+                      >
+                        + {item.token}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <textarea
+                  ref={emailBodyRef}
+                  className="input mono"
+                  rows={10}
+                  value={emailBodyHtml}
+                  onChange={e => setEmailBodyHtml(e.target.value)}
+                  style={{ fontSize: 12 }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Attachment (Optional Brochure, Catalog or PDF — Max 10 MiB)</span>
+                  {attachmentFile && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      style={{ color: '#dc2626', padding: '0 4px', fontSize: 11 }}
+                      onClick={() => setAttachmentFile(null)}
+                    >
+                      ✕ Remove ({attachmentFile.name})
+                    </button>
+                  )}
+                </label>
+                <input
+                  type="file"
+                  className="input"
+                  style={{ fontSize: 12, padding: '6px 8px' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    if (f && f.size > 10 * 1024 * 1024) {
+                      showFeedback('Attachment must be under 10 MiB', 'error');
+                      e.target.value = '';
+                      return;
+                    }
+                    setAttachmentFile(f);
+                  }}
+                />
+              </div>
+
+              {/* Dynamic Live Preview (Always visible with real recipient or sample fallback) */}
+              {(() => {
+                const previewRecipient = (audienceType === 'DIRECT' && directEmail)
+                  ? { email: directEmail, firstName: directFirstName || 'Partner', lastName: directLastName || '', company: directCompany || 'Oxygen to Innovation' }
+                  : (matchedContacts.length > 0)
+                    ? matchedContacts[0]
+                    : { email: 'client@example.com', firstName: 'Partner', lastName: '', company: 'Oxygen to Innovation' };
+
+                const isSample = audienceType !== 'DIRECT' && matchedContacts.length === 0;
+
+                const renderedSubject = (emailSubject || '')
+                  .replace(/\{\{firstName\}\}/gi, previewRecipient.firstName || 'Partner')
+                  .replace(/\{\{lastName\}\}/gi, previewRecipient.lastName || '')
+                  .replace(/\{\{company\}\}/gi, previewRecipient.company || 'Oxygen to Innovation')
+                  .replace(/\{\{email\}\}/gi, previewRecipient.email || 'client@example.com')
+                  .replace(/\{\{senderName\}\}/gi, senderName || 'Oxygen to Innovation');
+
+                const renderedHtml = (emailBodyHtml || '')
+                  .replace(/\{\{firstName\}\}/gi, `<span style="background: rgba(99,102,241,0.15); padding: 1px 5px; border-radius: 4px; color: #4338ca; font-weight: 600;">${previewRecipient.firstName || 'Partner'}</span>`)
+                  .replace(/\{\{lastName\}\}/gi, previewRecipient.lastName ? `<span style="background: rgba(2,132,199,0.15); padding: 1px 5px; border-radius: 4px; color: #0284c7; font-weight: 600;">${previewRecipient.lastName}</span>` : '')
+                  .replace(/\{\{company\}\}/gi, `<span style="background: rgba(16,185,129,0.15); padding: 1px 5px; border-radius: 4px; color: #047857; font-weight: 600;">${previewRecipient.company || 'Oxygen to Innovation'}</span>`)
+                  .replace(/\{\{email\}\}/gi, `<span style="background: rgba(245,158,11,0.15); padding: 1px 5px; border-radius: 4px; color: #b45309; font-weight: 600;">${previewRecipient.email || 'client@example.com'}</span>`)
+                  .replace(/\{\{senderName\}\}/gi, senderName || 'Oxygen to Innovation');
+
+                return (
+                  <div style={{ padding: '14px 16px', borderRadius: 8, background: 'var(--bg-hover)', border: '1px solid var(--border-default)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Eye size={12} /> Live Preview (Tokens Rendered)
+                      </div>
+                      <div style={{ fontSize: 11, color: isSample ? '#f59e0b' : 'var(--brand-primary, #2563eb)' }}>
+                        {isSample ? '⚡ Sample Preview: ' : '✓ Preview Recipient: '}
+                        <strong>{previewRecipient.email}</strong> ({previewRecipient.firstName} {previewRecipient.lastName || ''} @ {previewRecipient.company})
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border-subtle)' }}>
+                      Subject: {renderedSubject}
+                    </div>
+                    <div
+                      style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}
+                      dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                    />
+                  </div>
+                );
+              })()}
+
+              {/* Active Campaign Result */}
+              {activeCampaignResult && (
+                <div style={{
+                  padding: '12px 14px', borderRadius: 8,
+                  background: activeCampaignResult.status === 'FAILED' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+                  border: `1px solid ${activeCampaignResult.status === 'FAILED' ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
+                  color: activeCampaignResult.status === 'FAILED' ? '#dc2626' : '#16a34a',
+                  fontSize: 12
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                    {activeCampaignResult.status === 'FAILED' ? '✕ Campaign Failed' : '✓ Campaign Accepted'} — ID: {activeCampaignResult.campaignId || 'CMP-QUEUED'}
+                  </div>
+                  <div>Recipients: {activeCampaignResult.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length)} contacts ({audienceType === 'DIRECT' ? directEmail : (audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List'))})</div>
+                  {activeCampaignResult.sent !== undefined && (
+                    <div>Sent: <strong>{activeCampaignResult.sent}</strong> · Failed: <strong>{activeCampaignResult.failed || 0}</strong></div>
+                  )}
+                  {activeCampaignResult.note && (
+                    <div style={{ marginTop: 4, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                      ℹ {activeCampaignResult.note}
+                    </div>
+                  )}
+                  {activeCampaignResult.errorDetail && (
+                    <div style={{ marginTop: 4, color: '#dc2626', fontWeight: 600 }}>
+                      ⚠ Error: {activeCampaignResult.errorDetail}
+                    </div>
+                  )}
+                  {trackingStatus && (
+                    <div style={{ marginTop: 4, color: 'var(--text-primary)' }}>
+                      Status: <strong>{trackingStatus.status}</strong> ·
+                      Delivered: {trackingStatus.deliveredCount ?? trackingStatus.delivered ?? 0} ·
+                      Opened: {trackingStatus.openedCount ?? trackingStatus.opened ?? 0} ·
+                      Bounced: {trackingStatus.bouncedCount ?? trackingStatus.bounced ?? 0}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Target: <strong>{audienceType === 'DIRECT' ? (directEmail || 'Direct Recipient') : `${matchedContacts.length} recipients`}</strong> {audienceType === 'DIRECT' ? '' : `(${audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List')})`}
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-solid"
+                  style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px' }}
+                  disabled={isSending || (audienceType === 'DIRECT' ? !directEmail : matchedContacts.length === 0)}
+                >
+                  <Send size={13} /> {isSending ? 'Dispatching...' : (audienceType === 'DIRECT' ? '⚡ Send Single Test Email' : `Send Bulk Email (${matchedContacts.length})`)}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TAB: CAMPAIGNS ─── */}
+      {activeTab === 'Campaigns' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Dispatched Outreach Campaigns</h3>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                Track delivery, status, and target audiences for all bulk campaigns.
+              </p>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={fetchCampaignsList}>
+              <RefreshCw size={13} /> Refresh
+            </button>
+          </div>
+
+          {campaignsList.length === 0 ? (
+            <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+              No campaigns dispatched yet. Use the <strong>Email Sender</strong> tab to launch your first outreach campaign.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
+              {campaignsList.map((camp, idx) => (
+                <div key={camp.id || camp.campaignId || idx} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {camp.id || camp.campaignId}
+                      </span>
+                      <span className={`pill-badge ${camp.status === 'COMPLETED' || camp.status === 'DEPLOYED' || camp.status === 'APPROVED' ? 'success' : (camp.status === 'FAILED' ? 'danger' : 'neutral')}`}>
+                        {camp.status}
+                      </span>
+                    </div>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 6px' }}>{camp.title || camp.campaignName}</h4>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                      <strong>Audience:</strong> {camp.targetSegment || camp.targetDomain}
+                    </div>
+                    {camp.subject && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <strong>Subject:</strong> {camp.subject}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ paddingTop: 10, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+                    <span>{camp.createdAt || (camp.dispatchedAt ? new Date(camp.dispatchedAt).toLocaleString() : 'Recent')}</span>
+                    {camp.sentCount !== undefined ? (
+                      <span><strong>{camp.sentCount}</strong> / {camp.totalRecipients || 0} sent</span>
+                    ) : (
+                      <span>{camp.metrics?.targetReach || 'Active'}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── TAB: EMAIL TEMPLATES ─── */}
+      {activeTab === 'Templates' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          {templates.length === 0 && (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+              No email templates yet. Compose an email and click "Save as Template".
+            </div>
+          )}
+          {templates.map(tpl => (
+            <div key={tpl.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <span className="badge" style={{ fontSize: 10 }}>{tpl.industry || 'Enterprise'}</span>
+                    {tpl.tone && <span className="badge" style={{ fontSize: 10, opacity: 0.7 }}>{tpl.tone}</span>}
+                  </div>
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    style={{ color: '#dc2626' }}
+                    onClick={() => handleDeleteTemplate(tpl.id, tpl.name)}
+                    title="Delete template"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{tpl.name}</h4>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+                  {tpl.subject}
+                </div>
+                <div
+                  style={{ fontSize: 11.5, color: 'var(--text-secondary)', maxHeight: 80, overflow: 'hidden', lineHeight: 1.5 }}
+                  dangerouslySetInnerHTML={{ __html: tpl.contentHtml }}
+                />
+              </div>
+
+              <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-solid"
+                  onClick={() => {
+                    setEmailSubject(tpl.subject);
+                    setEmailBodyHtml(tpl.contentHtml);
+                    setCampaignName(tpl.name);
+                    setActiveTab('Sender');
+                    showFeedback(`Loaded template "${tpl.name}" into Email Sender.`);
+                  }}
+                >
+                  Use in Sender <ArrowRight size={10} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* SAVE TEMPLATE MODAL */}
+      {showSaveTemplateModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowSaveTemplateModal(false)}
+        >
+          <div
+            style={{ background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)', maxWidth: 440, width: '100%', padding: 22 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700 }}>Save as Reusable Template</h3>
+            <div style={{ marginBottom: 14 }}>
+              <label className="form-label">Template Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g. Automotive Executive Outreach"
+                value={newTemplateName}
+                onChange={e => setNewTemplateName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowSaveTemplateModal(false)}>Cancel</button>
+              <button
+                className="btn btn-solid btn-sm"
+                style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff' }}
+                onClick={handleSaveTemplate}
+                disabled={!newTemplateName.trim()}
+              >
+                Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

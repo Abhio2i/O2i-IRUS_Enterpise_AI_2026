@@ -1,0 +1,6 @@
+package com.example.agentic_ai_platform.marketing.entity;
+import jakarta.persistence.*; import java.time.Instant; import java.util.UUID;
+@Entity @Table(name="mkt_customer_360_signals") public class Customer360Signal {
+ @Id private UUID id; @Column(name="tenant_id",nullable=false) private UUID tenantId; @Column(name="account_id",nullable=false) private UUID accountId; @Column(name="signal_type",nullable=false,length=40) private String signalType; @Column(nullable=false,length=1000) private String description; @Column(length=80) private String source; @Column(name="observed_at",nullable=false) private Instant observedAt; protected Customer360Signal(){}
+ public Customer360Signal(UUID id,UUID tenant,UUID account,com.example.agentic_ai_platform.marketing.dto.Customer360SignalRequest r){this.id=id;tenantId=tenant;accountId=account;signalType=r.signalType();description=r.description();source=r.source();observedAt=r.observedAt()==null?Instant.now():r.observedAt();} public UUID getId(){return id;} public String getSignalType(){return signalType;} public String getDescription(){return description;} public String getSource(){return source;} public Instant getObservedAt(){return observedAt;}
+}

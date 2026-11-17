@@ -1,0 +1,1409 @@
+{
+  "info": {
+    "name": "Agentic AI Platform",
+    "description": "API collection including auth, document intake, marketing customer lists, proposal generation and lifecycle/email sending, and brochure/catalog asset file operations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9095"
+    },
+    {
+      "key": "tenantId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "email",
+      "value": "admin@example.com"
+    },
+    {
+      "key": "password",
+      "value": "ChangeThisLocalPassword123!"
+    },
+    {
+      "key": "displayName",
+      "value": "Local Admin"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "documentType",
+      "value": "INVOICE"
+    },
+    {
+      "key": "documentId",
+      "value": ""
+    },
+    {
+      "key": "source",
+      "value": "Direct Upload"
+    },
+    {
+      "key": "customerListId",
+      "value": ""
+    },
+    {
+      "key": "contactId",
+      "value": ""
+    },
+    {
+      "key": "marketingAssetId",
+      "value": ""
+    },
+    {
+      "key": "contactDomain",
+      "value": "volvo.se"
+    },
+    {
+      "key": "campaignId",
+      "value": ""
+    },
+    {
+      "key": "templateId",
+      "value": ""
+    },
+    {
+      "key": "smtpConfigured",
+      "value": "Configure SMTP_HOST/SMTP_PORT/SMTP_USERNAME/SMTP_PASSWORD/SMTP_FROM on server"
+    },
+    {
+      "key": "senderEmail",
+      "value": "verified-sender@example.com"
+    },
+    {
+      "key": "assetFolder",
+      "value": "Enterprise 2026"
+    },
+    {
+      "key": "proposalId",
+      "value": ""
+    },
+    {
+      "key": "proposalBudget",
+      "value": "50000"
+    },
+    {
+      "key": "customer360AccountId",
+      "value": ""
+    },
+    {
+      "key": "search",
+      "value": ""
+    },
+    {
+      "key": "industry",
+      "value": ""
+    },
+    {
+      "key": "tier",
+      "value": ""
+    },
+    {
+      "key": "status",
+      "value": ""
+    },
+    {
+      "key": "seoKeywordId",
+      "value": ""
+    },
+    {
+      "key": "seoKeyword",
+      "value": "enterprise AI operations"
+    }
+  ],
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"displayName\": \"{{displayName}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantId\": \"{{tenantId}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Refresh",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/refresh",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/auth/logout",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Intake Document",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/api/documents/intake",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            },
+            {
+              "key": "documentType",
+              "value": "INVOICE"
+            },
+            {
+              "key": "source",
+              "value": "Direct Upload"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Documents",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/documents",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Document",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/documents/{{documentId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "View / Download Document",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/documents/{{documentId}}/content",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Marketing - Domain Campaigns, Templates & Assets",
+      "description": "Upload and manage brochure/catalog files in the authenticated tenant. Login first; upload response saves marketingAssetId.",
+      "item": [
+        {
+          "name": "List Marketing Assets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Brochure or Catalog",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "type",
+                  "value": "BROCHURE"
+                }
+              ]
+            },
+            "description": "Multipart file upload. type must be BROCHURE or CATALOG. Maximum 20 MiB."
+          },
+          "response": [],
+          "event": {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Upload returns 201', () => pm.response.to.have.status(201));",
+                "if(pm.response.code===201) pm.collectionVariables.set('marketingAssetId',pm.response.json().id);"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Marketing Asset",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets/{{marketingAssetId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Preview Marketing Asset",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets/{{marketingAssetId}}/content",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Download Marketing Asset",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets/{{marketingAssetId}}/content?download=true",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Marketing Asset Type",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets/{{marketingAssetId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "CATALOG"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Marketing Asset",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/marketing/assets/{{marketingAssetId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Find Marketing Contacts by Domain",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/contacts?domain={{contactDomain}}",
+            "description": "Returns only this tenant?s contacts whose email ends with @{{contactDomain}}. Requires bearer accessToken."
+          },
+          "response": []
+        },
+        {
+          "name": "Generate AI Email Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/content/generate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetDomain\": \"{{contactDomain}}\",\n  \"industry\": \"Automotive\",\n  \"tone\": \"EXECUTIVE\",\n  \"topic\": \"ERP Modernisation & AI Supply Chain Integration\",\n  \"callToAction\": \"Schedule a 15-min Architecture Review\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Bulk Marketing Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/campaigns/send-bulk",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "campaignName",
+                  "value": "Q4 Financial Services ABM Outreach",
+                  "type": "text"
+                },
+                {
+                  "key": "targetDomain",
+                  "value": "{{contactDomain}}",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "A practical path to faster exception settlement at {{company}}",
+                  "type": "text"
+                },
+                {
+                  "key": "contentHtml",
+                  "value": "<p>Hi {{firstName}},</p>\n<p>Financial services organizations are under growing pressure to make settlement faster, strengthen operational resilience, and provide clear oversight across complex workflows. Many teams still rely on manual document handling and disconnected processes, which can slow exception resolution and make it harder to identify the source of delays.</p>\n<p>Our enterprise platform helps connect ERP workflows with AI-assisted document processing and operational integrations. It can capture and classify incoming documents, extract key information, validate it against business rules, and route exceptions to the right people for review. Teams retain control over approval steps while reducing repetitive data entry and handoffs.</p>\n<p>For {{company}}, a practical modernization effort could begin with one high-volume settlement or supply chain workflow. We would map the current process, identify where data is re-entered or exceptions wait, and outline a phased integration approach that works with your existing ERP and security requirements.</p>\n<p>The initial architecture review can cover:</p>\n<ul><li>Current ERP and document-processing touchpoints</li><li>Exception queues, approval controls, and audit requirements</li><li>Integration options and a focused pilot scope</li><li>Measures for processing time, exception rates, and operational visibility</li></ul>\n<p>If useful, I can send a short solution brief and walk through a reference architecture with your engineering and operations stakeholders.</p>\n<p><a href=\"https://example.com/schedule\">Schedule a 15-minute Architecture Review</a>, or reply with a time that works for you.</p>\n<p>Best regards,<br>{{senderName}}<br>Agentic AI Platform</p>\n<p><small>If this topic is not relevant to your role, reply and we will update your contact preferences.</small></p>",
+                  "type": "text"
+                },
+                {
+                  "key": "fromEmail",
+                  "value": "{{senderEmail}}",
+                  "type": "text",
+                  "description": "Must match the verified SMTP_FROM configured on the server."
+                },
+                {
+                  "key": "senderName",
+                  "value": "Agentic AI Platform",
+                  "type": "text"
+                },
+                {
+                  "key": "replyTo",
+                  "value": "sales@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "variables",
+                  "value": "firstName",
+                  "type": "text"
+                },
+                {
+                  "key": "variables",
+                  "value": "company",
+                  "type": "text"
+                },
+                {
+                  "key": "variables",
+                  "value": "senderName",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "description": "SMTP bulk email endpoint. Use multipart/form-data. Provide all text fields and optionally select one attachment file (max 10 MiB). Server must have SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD and SMTP_FROM configured. Enter fromEmail in the request form; it must equal the verified SMTP_FROM server setting."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Campaign request accepted', function () { pm.response.to.have.status(202); });",
+                  "if(pm.response.code===202) { const r=pm.response.json(); pm.collectionVariables.set('campaignId',r.campaignId); console.log('Sent:',r.sent,'Failed:',r.failed); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Campaign Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/campaigns/{{campaignId}}/status",
+            "description": "Returns counters for this SMTP campaign in this application process. SMTP confirms accepted sends only; opened/clicked remain zero without tracking integration."
+          },
+          "response": []
+        },
+        {
+          "name": "List Email Templates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/templates"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Email Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/templates",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Automotive Executive Outreach\",\n  \"subject\": \"Optimising Supply Chain Latency\",\n  \"contentHtml\": \"<p>Hi {{firstName}},</p><p>For {{company}}...</p>\",\n  \"contentText\": \"Hi {{firstName}}, For {{company}}...\",\n  \"industry\": \"Automotive\",\n  \"tone\": \"EXECUTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Email Template",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/templates/{{templateId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "List Marketing Asset Folders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/assets/folders",
+            "description": "Lists folder names inferred from uploaded tenant assets."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Brochure or Catalog to Folder",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/assets",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "type",
+                  "value": "BROCHURE",
+                  "type": "text"
+                },
+                {
+                  "key": "folder",
+                  "value": "Enterprise 2026",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "Upload one asset into a named folder."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Upload Brochures or Catalogs",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/assets/bulk",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select multiple files (up to 50). Repeat this form field for each file."
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "type",
+                  "value": "CATALOG",
+                  "type": "text"
+                },
+                {
+                  "key": "folder",
+                  "value": "ERP Integrations",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "Select up to 50 files using repeated files form parts. All selected files are stored under the chosen folder and type."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Marketing - Proposals",
+      "description": "Proposal lifecycle. Login first. Generate draft, save it, edit/status-track, then send after review. Groq and SMTP must be configured for generation and email.",
+      "item": [
+        {
+          "name": "Generate AI Proposal Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/proposals/generate",
+            "description": "Returns editable proposal content; it does not persist a proposal.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientCompany\": \"Northwind Logistics\",\n  \"contactName\": \"Alex Kim\",\n  \"contactEmail\": \"alex@example.com\",\n  \"industry\": \"Logistics\",\n  \"useCase\": \"Automate shipment document intake and exception handling\",\n  \"services\": [\n    \"Document Intake AI\",\n    \"Sentry Defense\"\n  ],\n  \"budget\": 50000,\n  \"timeline\": \"3 months\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Proposal Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/proposals",
+            "description": "Creates a saved DRAFT. Save generated content using Update Proposal.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientCompany\": \"Northwind Logistics\",\n  \"contactName\": \"Alex Kim\",\n  \"contactEmail\": \"alex@example.com\",\n  \"industry\": \"Logistics\",\n  \"useCase\": \"Automate shipment document intake and exception handling\",\n  \"services\": [\n    \"Document Intake AI\",\n    \"Sentry Defense\"\n  ],\n  \"budget\": 50000,\n  \"timeline\": \"3 months\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(pm.response.code===200||pm.response.code===201) pm.collectionVariables.set('proposalId',pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Proposals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/proposals",
+            "description": "Lists proposals belonging to the authenticated tenant."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Proposal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/proposals/{{proposalId}}",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update Proposal Content and Deal Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/proposals/{{proposalId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": {\n    \"executiveSummary\": \"AI generated or edited summary\",\n    \"challenges\": \"Client challenges\",\n    \"solutionArchitecture\": \"Proposed architecture\",\n    \"scopeOfWork\": [\n      \"Discovery\",\n      \"Implementation\"\n    ],\n    \"milestones\": [\n      {\n        \"phase\": \"Phase 1\",\n        \"duration\": \"1 month\",\n        \"deliverables\": [\n          \"Configured solution\"\n        ]\n      }\n    ],\n    \"pricingBreakdown\": [\n      {\n        \"item\": \"Implementation\",\n        \"amount\": 50000\n      }\n    ],\n    \"roiEstimate\": \"Estimate subject to validation\",\n    \"commercialTerms\": \"Valid for 30 days\"\n  },\n  \"status\": \"DRAFT\",\n  \"winProbability\": 40,\n  \"nextAction\": \"Schedule stakeholder review\",\n  \"followUpDate\": \"2026-11-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Proposal Email",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/marketing/proposals/{{proposalId}}/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "marketing",
+                "proposals",
+                "{{proposalId}}",
+                "send"
+              ]
+            },
+            "description": "Sends the saved proposal to its client contact using SMTP. Multipart form supports reviewed subject/HTML, reply-to and an optional attachment (max 10 MiB). If subject/contentHtml are blank, defaults are generated from the saved proposal. SMTP must be configured; failures return an error and do not mark the proposal sent.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "subject",
+                  "value": "Enterprise Business Proposal: Northwind Logistics",
+                  "type": "text",
+                  "description": "Optional; defaults to proposal subject."
+                },
+                {
+                  "key": "contentHtml",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional reviewed HTML. Leave blank to render the saved proposal into a safe HTML email."
+                },
+                {
+                  "key": "replyTo",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": "",
+                  "description": "Optional brochure/catalog attachment, maximum 10 MiB."
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Proposal Pipeline Totals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/proposals/pipeline",
+            "description": "Returns gross and probability-weighted open pipeline totals."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Customer 360",
+      "item": [
+        {
+          "name": "List Customer 360 Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360?q={{search}}&industry={{industry}}&tier={{tier}}&status={{status}}",
+            "description": "Tenant scoped account list with optional filters."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer 360 Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Scania Logistics Nordic\", \"domain\": \"scania.com\", \"industry\": \"Logistics\", \"tier\": \"TIER_1\", \"annualContractValue\": 420000, \"currency\": \"USD\", \"healthScore\": 92, \"churnProbability\": 8, \"leadScore\": 88, \"customerStatus\": \"ACTIVE\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer 360 Account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360/{{customer360AccountId}}",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer 360 Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360/{{customer360AccountId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Scania Logistics Nordic\", \"domain\": \"scania.com\", \"industry\": \"Logistics\", \"tier\": \"TIER_1\", \"annualContractValue\": 420000, \"currency\": \"USD\", \"healthScore\": 92, \"churnProbability\": 8, \"leadScore\": 88, \"customerStatus\": \"ACTIVE\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Telemetry Signal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360/{{customer360AccountId}}/signals",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"signalType\": \"USAGE\", \"description\": \"High API query volume\", \"source\": \"API telemetry\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Telemetry Signals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360/{{customer360AccountId}}/signals",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Add NBO Recommendation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360/{{customer360AccountId}}/offers",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Process Mining Real-Time Kafka Connector\", \"rationale\": \"High API usage suggests expansion opportunity\", \"offerType\": \"CROSS_SELL\", \"status\": \"RECOMMENDED\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List NBO Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/customer-360/{{customer360AccountId}}/offers",
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SEO Keywords",
+      "item": [
+        {
+          "name": "List SEO Keywords",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/seo/keywords?q={{seoKeyword}}&maxDifficulty=100",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create SEO Keyword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/seo/keywords",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"keyword\": \"enterprise AI operations\", \"targetPage\": \"https://example.com/enterprise-ai\", \"searchVolume\": 2400, \"difficulty\": 68, \"intent\": \"COMMERCIAL\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete SEO Keyword",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/seo/keywords/{{seoKeywordId}}",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Optimize SEO Keyword",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/seo/keywords/{{seoKeywordId}}/optimize",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Run Demo SEO Sweep",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/marketing/seo/sweep",
+            "description": "Runs synthetic demo rank movement. This is not Google Search Console data."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
