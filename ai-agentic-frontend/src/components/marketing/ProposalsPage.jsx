@@ -260,7 +260,7 @@ export const ProposalsPage = () => {
       setUploadFile(file);
       if (!uploadFormData.clientCompany) {
         const baseName = file.name.replace(/\.[^/.]+$/, '');
-        const clean = baseName.replace(/[_-]/g, ' ').replace(/(?i)(proposal|contract|draft|final|v\d+)/g, '').trim();
+        const clean = baseName.replace(/[_-]/g, ' ').replace(/(proposal|contract|draft|final|v\d+)/gi, '').trim();
         if (clean) {
           setUploadFormData(prev => ({
             ...prev,
