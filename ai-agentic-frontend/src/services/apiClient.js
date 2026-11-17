@@ -1842,6 +1842,40 @@ export async function downloadProposalDocument(proposalId, fallbackFilename = 'p
 }
 
 /**
+ * Fetch Proposal Original Document as Raw Blob
+ * GET /api/marketing/proposals/:id/document
+ */
+export async function getProposalDocumentBlob(proposalId) {
+  if (!proposalId) throw new Error('proposalId is required');
+  let headers = getAuthHeaders();
+
+  let res = await fetch(`${BACKEND_URL}/api/marketing/proposals/${encodeURIComponent(proposalId)}/document`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        headers = getAuthHeaders();
+        res = await fetch(`${BACKEND_URL}/api/marketing/proposals/${encodeURIComponent(proposalId)}/document`, {
+          method: 'GET',
+          headers,
+        });
+      }
+    } catch {}
+  }
+
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to fetch proposal document');
+    throw new Error(err);
+  }
+
+  return await res.blob();
+}
+
+/**
  * List Proposals
  * GET /api/marketing/proposals
  */

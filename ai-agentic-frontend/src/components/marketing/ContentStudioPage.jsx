@@ -19,6 +19,7 @@ import {
   getCustomerListContacts,
   listCampaigns,
   listMarketingAssets,
+  getProposalDocumentBlob,
 } from '../../services/apiClient';
 
 export const ContentStudioPage = () => {
@@ -41,6 +42,7 @@ export const ContentStudioPage = () => {
   const [directFirstName, setDirectFirstName] = useState('');
   const [directLastName, setDirectLastName] = useState('');
   const [directCompany, setDirectCompany] = useState('Oxygen to Innovation');
+  const [syncedProposal, setSyncedProposal] = useState(null);
 
   // Marketing Assets for Brochure / Catalog Grounding
   const [marketingAssets, setMarketingAssets] = useState([]);
@@ -250,6 +252,49 @@ export const ContentStudioPage = () => {
       .catch(() => {});
   }, []); // intentionally run once on mount
 
+  const applyProposalDraft = async (prop) => {
+    if (!prop) return;
+    setActiveTab('Sender');
+    setSyncedProposal(prop);
+
+    if (prop.campaignName) setCampaignName(prop.campaignName);
+    if (prop.subject) setEmailSubject(prop.subject);
+    if (prop.bodyHtml) setEmailBodyHtml(prop.bodyHtml);
+
+    if (prop.contactEmail && prop.contactEmail.includes('@')) {
+      setAudienceType('DIRECT');
+      setDirectEmail(prop.contactEmail.trim());
+      if (prop.contactName) {
+        const parts = prop.contactName.trim().split(/\s+/);
+        setDirectFirstName(parts[0] || '');
+        setDirectLastName(parts.slice(1).join(' ') || '');
+      } else {
+        setDirectFirstName('');
+        setDirectLastName('');
+      }
+      if (prop.company) setDirectCompany(prop.company.trim());
+    } else if (prop.domain) {
+      setAudienceType('DOMAIN');
+      setTargetDomain(prop.domain);
+      fetchDomainContacts(prop.domain);
+    }
+
+    // Auto-fetch original proposal document if present and not already attached
+    if (prop.proposalId && prop.originalFilename) {
+      try {
+        const blob = await getProposalDocumentBlob(prop.proposalId);
+        if (blob && blob.size > 0) {
+          const file = new File([blob], prop.originalFilename, { type: blob.type || 'application/pdf' });
+          setAttachmentFile(file);
+        }
+      } catch (err) {
+        console.warn('Could not auto-attach proposal document blob:', err.message);
+      }
+    }
+
+    showFeedback(`Proposal for "${prop.company}" automatically drafted and synced in Email Sender!`, 'success');
+  };
+
   useEffect(() => {
     if (audienceType === 'LIST') {
       if (selectedListId) {
@@ -257,12 +302,12 @@ export const ContentStudioPage = () => {
       } else {
         setMatchedContacts([]);
       }
-    } else {
+    } else if (audienceType === 'DOMAIN') {
       fetchDomainContacts(targetDomain);
     }
   }, [audienceType, selectedListId]);
 
-  // Check if routed from Customer Lists or Proposals
+  // Check if routed from Customer Lists or Proposals on mount
   useEffect(() => {
     const preselectedListId = localStorage.getItem('selectedCampaignListId');
     const preselectedListName = localStorage.getItem('selectedCampaignListName');
@@ -278,34 +323,17 @@ export const ContentStudioPage = () => {
       localStorage.removeItem('selectedCampaignListName');
     }
 
-    const proposalCampaignRaw = localStorage.getItem('selectedProposalCampaign');
+    const proposalCampaignRaw = localStorage.getItem('selectedProposalCampaign') || localStorage.getItem('activeSelectedProposal');
     if (proposalCampaignRaw) {
       try {
         const prop = JSON.parse(proposalCampaignRaw);
-        setActiveTab('Sender');
-        if (prop.campaignName) setCampaignName(prop.campaignName);
-        if (prop.subject) setEmailSubject(prop.subject);
-        if (prop.bodyHtml) setEmailBodyHtml(prop.bodyHtml);
-
-        if (prop.contactEmail) {
-          setAudienceType('DIRECT');
-          setDirectEmail(prop.contactEmail.trim());
-          if (prop.contactName) {
-            const parts = prop.contactName.trim().split(/\s+/);
-            setDirectFirstName(parts[0] || '');
-            setDirectLastName(parts.slice(1).join(' ') || '');
-          }
-          if (prop.company) setDirectCompany(prop.company.trim());
-        } else if (prop.domain) {
-          setAudienceType('DOMAIN');
-          setTargetDomain(prop.domain);
-          fetchDomainContacts(prop.domain);
-        }
-        showFeedback(`Proposal for ${prop.company} loaded into Email Sender! Contact: ${prop.contactEmail || prop.domain}`, 'success');
-      } catch (e) {}
+        applyProposalDraft(prop);
+      } catch (e) {
+        console.warn('Proposal sync parse warning:', e.message);
+      }
       localStorage.removeItem('selectedProposalCampaign');
     }
-  }, [savedLists]);
+  }, []);
 
   // Handle AI Email Generation
   const handleGenerateAi = async () => {
@@ -540,7 +568,58 @@ export const ContentStudioPage = () => {
 
       {/* ─── TAB: EMAIL SENDER ─── */}
       {activeTab === 'Sender' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20 }}>
+        <div>
+          {syncedProposal && (
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: 8,
+              marginBottom: 16,
+              background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(99,102,241,0.08))',
+              border: '1px solid rgba(37,99,235,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 6,
+                  background: '#2563eb', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    ⚡ Proposal Auto-Draft Synced: {syncedProposal.company}
+                    <span className="badge success" style={{ fontSize: 10 }}>{syncedProposal.status || 'ACTIVE'}</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563eb' }}>{syncedProposal.value}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Recipient: <strong>{syncedProposal.contactEmail || syncedProposal.domain}</strong> · Subject, executive proposal pitch, and attachment auto-drafted from proposal.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  onClick={() => {
+                    setSyncedProposal(null);
+                    localStorage.removeItem('activeSelectedProposal');
+                    localStorage.removeItem('selectedProposalCampaign');
+                    showFeedback('Unlinked proposal draft.', 'info');
+                  }}
+                  style={{ fontSize: 11 }}
+                >
+                  ✕ Unlink Proposal
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20 }}>
           {/* LEFT: Target Domain & AI Generator Settings */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* 1. Target Audience Box (Domain, Saved List, or Direct Test) */}
@@ -1120,11 +1199,12 @@ export const ContentStudioPage = () => {
                   style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px' }}
                   disabled={isSending || (audienceType === 'DIRECT' ? !directEmail : matchedContacts.length === 0)}
                 >
-                  <Send size={13} /> {isSending ? 'Dispatching...' : (audienceType === 'DIRECT' ? '⚡ Send Single Test Email' : `Send Bulk Email (${matchedContacts.length})`)}
+                  <Send size={13} /> {isSending ? 'Dispatching...' : (syncedProposal ? `⚡ Send Proposal to ${directFirstName || directEmail}` : (audienceType === 'DIRECT' ? '⚡ Send Single Test Email' : `Send Bulk Email (${matchedContacts.length})`))}
                 </button>
               </div>
             </form>
           </div>
+        </div>
         </div>
       )}
 

@@ -316,58 +316,115 @@ export const ProposalsPage = () => {
     }
   };
 
-  const handleOpenInEmailSender = (prop) => {
-    const domain = prop.contactEmail && prop.contactEmail.includes('@')
-      ? prop.contactEmail.split('@')[1]
-      : (prop.company ? prop.company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com' : 'example.com');
+  const buildProposalDraftData = (prop) => {
+    if (!prop) return null;
+    const company = prop.company || prop.clientCompany || 'Client Partner';
+    const contactName = prop.contactName || '';
+    const contactEmail = prop.contactEmail || '';
+    const domain = contactEmail && contactEmail.includes('@')
+      ? contactEmail.split('@')[1]
+      : (company ? company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com' : 'example.com');
 
-    const execSummary = prop.content?.executiveSummary || `${prop.company} Enterprise Proposal`;
-    const solution = prop.content?.solutionArchitecture || 'Modular Agentic AI Platform Integration';
-    const deliverables = Array.isArray(prop.content?.scopeOfWork) && prop.content.scopeOfWork.length > 0
-      ? `<ul>${prop.content.scopeOfWork.map(s => `<li>${s}</li>`).join('')}</ul>`
-      : `<ul>${(prop.products || []).map(p => `<li>${p}</li>`).join('')}</ul>`;
+    const title = prop.title || `${company} AI Transformation & Enterprise Proposal`;
+    const val = prop.value || (prop.budget ? `$${Number(prop.budget).toLocaleString()}` : '$75,000');
+    const validUntil = prop.validUntil || prop.followUpDate || '2026-12-31';
+    const status = prop.status || 'ACTIVE';
 
-    const terms = prop.content?.commercialTerms || `Valid until ${prop.validUntil}`;
+    const execSummary = prop.content?.executiveSummary || `Comprehensive enterprise artificial intelligence and automation strategy engineered specifically for ${company}. Designed to optimize workflows, eliminate process exceptions, and drive measurable ROI across operational units.`;
+    const solution = prop.content?.solutionArchitecture || 'Modular Agentic AI Architecture with Autonomous Workflow Executors, Real-Time Decision Engines, and Enterprise Security Boundaries.';
+    
+    const rawScope = prop.content?.scopeOfWork || prop.products || prop.services || [];
+    const deliverables = Array.isArray(rawScope) && rawScope.length > 0
+      ? rawScope
+      : ['Autonomous Multi-Agent Workflow Engine', 'Predictive Anomaly Detection & Exception Management', 'Enterprise Knowledge Graph & LLM Orchestration', '24/7 SLA & Dedicated Solutions Architecture Support'];
+
+    const deliverablesHtml = `<ul style="margin: 8px 0; padding-left: 20px; color: #334155; line-height: 1.6;">${deliverables.map(d => `<li style="margin-bottom: 4px;"><strong>${d}</strong></li>`).join('')}</ul>`;
+    const terms = prop.content?.commercialTerms || `Valid through ${validUntil} · Standard Enterprise Net-30 Payment Terms`;
 
     const attachmentNotice = prop.content?.originalFilename
-      ? `<div style="padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #166534; font-size: 13px; margin-bottom: 16px;">
-          📎 <strong>Attached Official Proposal Document:</strong> ${prop.content.originalFilename} (${Math.round((prop.content.fileSize || 0) / 1024)} KB)
+      ? `<div style="padding: 12px 16px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; font-size: 13px; margin: 16px 0; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">📎</span>
+          <div>
+            <strong>Attached Official Proposal Document:</strong> ${prop.content.originalFilename} 
+            <span style="opacity: 0.85;">(${Math.round((prop.content.fileSize || 0) / 1024)} KB)</span>
+            <div style="font-size: 11.5px; opacity: 0.9; margin-top: 2px;">The complete verified technical &amp; commercial specification is attached to this transmission.</div>
+          </div>
         </div>`
       : '';
 
-    const emailHtml = `<p>Dear ${prop.contactName || 'Team'},</p>
-<p>Thank you for discussing your operational objectives for <strong>${prop.company}</strong>. We are pleased to present our comprehensive commercial and technical proposal for your review.</p>
+    const emailHtml = `<p>Dear ${contactName ? contactName.split(' ')[0] : 'Team'},</p>
+
+<p>Thank you for discussing your strategic technology and operational objectives for <strong>${company}</strong>. We are pleased to present our customized commercial and technical proposal for your review.</p>
 
 ${attachmentNotice}
 
-<h3>Executive Summary</h3>
-<p>${execSummary}</p>
+<div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 18px 0; border-radius: 0 8px 8px 0;">
+  <h4 style="margin: 0 0 6px 0; color: #1e293b; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Executive Overview</h4>
+  <p style="margin: 0; color: #475569; font-size: 13.5px; line-height: 1.6;">${execSummary}</p>
+</div>
 
-<h3>Solution Architecture & Scope</h3>
-<p>${solution}</p>
-<p><strong>Deliverables Included:</strong></p>
-${deliverables}
+<h4 style="color: #1e293b; font-size: 14px; margin-top: 18px; margin-bottom: 6px;">Proposed Solution Architecture:</h4>
+<p style="color: #475569; font-size: 13.5px; margin-top: 0; margin-bottom: 12px; line-height: 1.5;">${solution}</p>
 
-<h3>Commercial Terms & Investment</h3>
-<p><strong>Total Contract Value:</strong> ${prop.value}</p>
-<p><strong>Proposal Validity:</strong> ${terms}</p>
+<div style="margin-bottom: 16px;">
+  <strong style="color: #1e293b; font-size: 13px;">Key Modules &amp; Deliverables Included:</strong>
+  ${deliverablesHtml}
+</div>
 
-<p>Please review the proposal details above. You can reply directly to this email or <a href="https://example.com/schedule"><strong>schedule a 15-minute alignment call</strong></a> with our solutions team to finalize next steps.</p>
+<div style="background: #f1f5f9; padding: 14px 18px; border-radius: 8px; margin: 20px 0; border: 1px solid #e2e8f0;">
+  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <tr>
+      <td style="padding: 6px 0; color: #64748b;"><strong>Total Investment:</strong></td>
+      <td style="padding: 6px 0; font-weight: 800; color: #0f172a; text-align: right; font-family: monospace; font-size: 16px;">${val}</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px 0; color: #64748b;"><strong>Proposal Status:</strong></td>
+      <td style="padding: 6px 0; font-weight: 700; color: #16a34a; text-align: right;">${status}</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px 0; color: #64748b;"><strong>Validity &amp; Terms:</strong></td>
+      <td style="padding: 6px 0; color: #334155; text-align: right;">${terms}</td>
+    </tr>
+  </table>
+</div>
 
-<p>Best regards,<br/><strong>{{senderName}}</strong><br/>Agentic AI Platform</p>`;
+<p>Please review the proposal details above. You can reply directly to this email or <a href="https://example.com/schedule" style="color: #2563eb; font-weight: 600; text-decoration: underline;"><strong>schedule a 15-minute alignment call</strong></a> with our solutions engineering team to confirm next steps and implementation dates.</p>
 
-    localStorage.setItem('selectedProposalCampaign', JSON.stringify({
+<p style="margin-top: 24px;">Warm regards,<br/><strong>{{senderName}}</strong><br/><span style="color: #64748b; font-size: 12px;">Agentic AI Platform · Solutions Architecture</span></p>`;
+
+    return {
       proposalId: prop.id,
-      company: prop.company,
-      contactEmail: prop.contactEmail,
-      contactName: prop.contactName,
-      domain: domain,
-      subject: `Enterprise Business Proposal: ${prop.title || prop.company}`,
-      campaignName: `${prop.company} Proposal Outreach`,
+      company,
+      contactEmail,
+      contactName,
+      domain,
+      value: val,
+      status,
+      title,
+      subject: `Enterprise Proposal: ${title} | ${company}`,
+      campaignName: `${company} Proposal Outreach`,
       bodyHtml: emailHtml,
-      originalFilename: prop.content?.originalFilename
-    }));
+      originalFilename: prop.content?.originalFilename || null,
+      fileSize: prop.content?.fileSize || null,
+      timestamp: Date.now()
+    };
+  };
 
+  const handleSelectProposal = (prop) => {
+    if (selected === prop.id) {
+      setSelected(null);
+      localStorage.removeItem('activeSelectedProposal');
+    } else {
+      setSelected(prop.id);
+      const draft = buildProposalDraftData(prop);
+      localStorage.setItem('activeSelectedProposal', JSON.stringify(draft));
+    }
+  };
+
+  const handleOpenInEmailSender = (prop) => {
+    const draft = buildProposalDraftData(prop);
+    localStorage.setItem('selectedProposalCampaign', JSON.stringify(draft));
+    localStorage.setItem('activeSelectedProposal', JSON.stringify(draft));
     dispatch(setActiveRoute('marketing.studio'));
   };
 
@@ -483,7 +540,7 @@ ${deliverables}
                   <div
                     key={prop.id}
                     className="card"
-                    onClick={() => setSelected(prop.id === selected ? null : prop.id)}
+                    onClick={() => handleSelectProposal(prop)}
                     style={{
                       cursor: 'pointer',
                       borderColor: selected === prop.id ? '#6366f1' : 'var(--border-default)',
@@ -687,7 +744,7 @@ ${deliverables}
                   style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}
                   onClick={() => handleOpenInEmailSender(selectedProp)}
                 >
-                  <Mail size={14} /> Open in Email Sender (Direct Dispatch)
+                  <Mail size={14} /> Open in Email Sender (Auto-Draft Email)
                 </button>
 
                 <button
