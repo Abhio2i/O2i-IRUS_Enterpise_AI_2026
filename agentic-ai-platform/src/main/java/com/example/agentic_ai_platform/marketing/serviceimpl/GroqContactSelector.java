@@ -63,6 +63,9 @@ public class GroqContactSelector {
             for (MarketingContact contact : contacts) {
                 ObjectNode candidate = candidates.addObject();
                 candidate.put("id", contact.getId().toString());
+                candidate.put("email", contact.getEmail());
+                putIfPresent(candidate, "firstName", contact.getFirstName());
+                putIfPresent(candidate, "lastName", contact.getLastName());
                 putIfPresent(candidate, "company", contact.getCompany());
                 putIfPresent(candidate, "title", contact.getTitle());
                 putIfPresent(candidate, "industry", contact.getIndustry());

@@ -133,8 +133,33 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
         int duplicates = 0;
         int invalid = 0;
         int processed = 0;
-        try (CSVParser parser = CSVParser.parse(new StringReader(csv),
-                CSVFormat.RFC4180.builder().setHeader().setSkipHeaderRecord(true).build())) {
+
+        char delimiter = ',';
+        if (csv.contains("\t") && !csv.contains(",")) {
+            delimiter = '\t';
+        } else if (csv.contains(";") && !csv.contains(",")) {
+            delimiter = ';';
+        } else if (csv.indexOf('\n') != -1) {
+            String firstLine = csv.substring(0, csv.indexOf('\n'));
+            long tabs = firstLine.chars().filter(ch -> ch == '\t').count();
+            long commas = firstLine.chars().filter(ch -> ch == ',').count();
+            long semicolons = firstLine.chars().filter(ch -> ch == ';').count();
+            if (tabs > commas && tabs > semicolons) {
+                delimiter = '\t';
+            } else if (semicolons > commas && semicolons > tabs) {
+                delimiter = ';';
+            }
+        }
+
+        CSVFormat csvFormat = CSVFormat.RFC4180.builder()
+                .setDelimiter(delimiter)
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .setIgnoreHeaderCase(true)
+                .setTrim(true)
+                .build();
+
+        try (CSVParser parser = CSVParser.parse(new StringReader(csv), csvFormat)) {
             Map<String, Integer> headerIndexes = validateHeaders(parser.getHeaderMap());
             for (CSVRecord record : parser) {
                 if (record.size() == 1 && record.get(0).isBlank()) {
@@ -146,10 +171,6 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
                             "CSV exceeds configured row limit of " + maxRows);
                 }
                 try {
-                    Integer emailIdx = headerIndexes.get("email");
-                    if (emailIdx == null || emailIdx >= record.size() || record.get(emailIdx).isBlank()) {
-                        throw new IllegalArgumentException("Row is missing required email value");
-                    }
                     MarketingContact contact = contactFromRecord(tenantId, record, headerIndexes);
                     String email = contact.getEmail();
                     if (existing.contains(email) || !seen.add(email)) {
@@ -230,90 +251,168 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
             }
             String canonical = canonicalHeader(header);
             if (!canonical.isEmpty()) {
-                if (indexes.putIfAbsent(canonical, index) != null) {
-                    throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Duplicate CSV header: " + header);
-                }
+                indexes.put(canonical, index);
             }
         });
-        if (!indexes.containsKey("email")) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "CSV requires an email header (e.g. 'email', 'Email Address')");
+
+        boolean hasEmail = indexes.containsKey("email") || indexes.containsKey("emailaddress")
+                || indexes.containsKey("mail") || indexes.containsKey("contactemail")
+                || rawHeaders.keySet().stream().anyMatch(h -> h != null && h.toLowerCase(Locale.ROOT).contains("email"));
+        if (!hasEmail) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "CSV requires an email header (e.g. 'Email', 'email', 'Email Address')");
         }
         return indexes;
     }
 
     private static String canonicalHeader(String raw) {
         if (raw == null) return "";
-        String clean = raw.trim().toLowerCase(Locale.ROOT).replaceAll("[\\s_\\-]+", "");
-        return switch (clean) {
-            case "email", "emailaddress", "mail" -> "email";
-            case "firstname", "first", "fname" -> "firstname";
-            case "lastname", "last", "lname", "surname" -> "lastname";
-            case "company", "companyname", "organization", "org" -> "company";
-            case "title", "jobtitle", "designation", "role" -> "title";
-            case "industry", "sector" -> "industry";
-            case "country", "location", "nation" -> "country";
-            case "customerstatus", "status" -> "customerstatus";
-            case "annualrevenue", "revenue" -> "annualrevenue";
-            case "churnprobability", "churn" -> "churnprobability";
-            default -> {
-                if (HEADER_LIMITS.containsKey(clean) || clean.equals("annualrevenue") || clean.equals("churnprobability")) {
-                    yield clean;
+        return raw.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private String firstNonBlank(CSVRecord record, Map<String, Integer> indexes, String... candidates) {
+        for (String candidate : candidates) {
+            Integer idx = indexes.get(candidate);
+            if (idx != null && idx < record.size()) {
+                String val = record.get(idx).trim();
+                if (!val.isBlank() && !val.equals("—") && !val.equalsIgnoreCase("null") && !val.equalsIgnoreCase("n/a")) {
+                    return val;
                 }
-                yield ""; // safely ignore unknown optional columns (like phone, id, notes)
             }
-        };
+        }
+        return "";
+    }
+
+    private static String capitalize(String str) {
+        if (str == null || str.isBlank()) return "";
+        str = str.trim();
+        return Character.toUpperCase(str.charAt(0)) + (str.length() > 1 ? str.substring(1).toLowerCase(Locale.ROOT) : "");
     }
 
     private MarketingContact contactFromRecord(UUID tenantId, CSVRecord record, Map<String, Integer> indexes) {
-        String email = value(record, indexes, "email").toLowerCase(Locale.ROOT);
-        if (email.length() > 320 || !EMAIL.matcher(email).matches()) {
-            throw new IllegalArgumentException("Invalid email");
+        String email = firstNonBlank(record, indexes, "email", "emailaddress", "mail", "contactemail").toLowerCase(Locale.ROOT);
+        if (email.isBlank() || email.length() > 320 || !EMAIL.matcher(email).matches()) {
+            throw new IllegalArgumentException("Invalid email: " + (email.isBlank() ? "empty" : email));
         }
-        BigDecimal revenue = decimal(value(record, indexes, "annualrevenue"), "annualRevenue");
-        if (revenue != null && (revenue.signum() < 0 || revenue.precision() > 19 || scale(revenue) > 2)) {
-            throw new IllegalArgumentException("annualRevenue must be non-negative with at most 2 decimals");
-        }
-        BigDecimal churn = decimal(value(record, indexes, "churnprobability"), "churnProbability");
-        if (churn != null && (churn.signum() < 0 || churn.compareTo(BigDecimal.valueOf(100)) > 0
-                || churn.precision() > 5 || scale(churn) > 2)) {
-            throw new IllegalArgumentException("churnProbability must be 0 to 100 with at most 2 decimals");
-        }
-        return new MarketingContact(UUID.randomUUID(), tenantId, email,
-                optional(value(record, indexes, "firstname"), "firstName"),
-                optional(value(record, indexes, "lastname"), "lastName"),
-                optional(value(record, indexes, "company"), "company"),
-                optional(value(record, indexes, "title"), "title"),
-                optional(value(record, indexes, "industry"), "industry"),
-                optional(value(record, indexes, "country"), "country"),
-                revenue,
-                optional(value(record, indexes, "customerstatus"), "customerStatus"),
-                churn);
-    }
 
-    private String value(CSVRecord record, Map<String, Integer> indexes, String name) {
-        Integer index = indexes.get(name);
-        return index == null || index >= record.size() ? "" : record.get(index).trim();
+        // 1. Company / Organization
+        String company = firstNonBlank(record, indexes, "company", "companyname", "organizationsite", "organization", "parentorganization", "org", "businessname", "institution", "account");
+
+        // 2. Industry / Category / Type
+        String industry = firstNonBlank(record, indexes, "industry", "category", "type", "sector", "vertical", "sitetype", "orgcategory");
+
+        // 3. Country / Location / Region / City
+        String country = firstNonBlank(record, indexes, "country", "nation");
+        if (country.isBlank()) {
+            String city = firstNonBlank(record, indexes, "city", "town");
+            String region = firstNonBlank(record, indexes, "region", "state", "province");
+            if (!city.isBlank() && !region.isBlank()) {
+                country = city + ", " + region;
+            } else if (!region.isBlank()) {
+                country = region;
+            } else if (!city.isBlank()) {
+                country = city;
+            } else {
+                country = firstNonBlank(record, indexes, "address", "location");
+            }
+        }
+        if (email.endsWith(".ca")) {
+            if (country.isBlank()) {
+                country = "Canada";
+            } else if (!country.toLowerCase(Locale.ROOT).contains("canada")) {
+                country = country + ", Canada";
+            }
+        }
+
+        // 4. Title / Site Role
+        String title = firstNonBlank(record, indexes, "title", "jobtitle", "designation", "role", "siterole", "contactcheck");
+
+        // 5. Name (First & Last)
+        String firstName = firstNonBlank(record, indexes, "firstname", "first", "fname");
+        String lastName = firstNonBlank(record, indexes, "lastname", "last", "lname", "surname");
+        if (firstName.isBlank() && lastName.isBlank()) {
+            String fullName = firstNonBlank(record, indexes, "name", "fullname", "contactname", "contactperson", "contact");
+            if (!fullName.isBlank()) {
+                String[] parts = fullName.trim().split("\\s+", 2);
+                firstName = parts[0];
+                if (parts.length > 1) {
+                    lastName = parts[1];
+                }
+            }
+        }
+
+        // Intelligent fallback if Name is still blank so UI and AI never show empty "—"
+        if (firstName.isBlank() && lastName.isBlank()) {
+            String local = email.contains("@") ? email.split("@")[0] : "";
+            if (local.contains(".")) {
+                String[] parts = local.split("\\.", 2);
+                firstName = capitalize(parts[0]);
+                lastName = capitalize(parts[1].replace(".", " "));
+            } else if (!company.isBlank()) {
+                firstName = company;
+                lastName = "Team";
+            } else if (!local.isBlank() && !local.equalsIgnoreCase("info") && !local.equalsIgnoreCase("contact") && !local.equalsIgnoreCase("admin")) {
+                firstName = capitalize(local);
+                lastName = "Contact";
+            } else {
+                firstName = "Primary";
+                lastName = "Contact";
+            }
+        }
+
+        // 6. Status (default ACTIVE)
+        String status = firstNonBlank(record, indexes, "customerstatus", "status", "accountstatus", "state");
+        if (status.isBlank()) {
+            status = "ACTIVE";
+        } else {
+            status = status.toUpperCase(Locale.ROOT);
+        }
+
+        // 7. Revenue
+        BigDecimal revenue = decimal(firstNonBlank(record, indexes, "annualrevenue", "revenue", "turnover", "arr", "sales"), "annualRevenue");
+
+        // 8. Churn Probability
+        BigDecimal churn = decimal(firstNonBlank(record, indexes, "churnprobability", "churn", "churnpercent", "churnrate", "risk"), "churnProbability");
+
+        return new MarketingContact(
+                UUID.randomUUID(), tenantId, email,
+                optional(firstName, "firstName"),
+                optional(lastName, "lastName"),
+                optional(company, "company"),
+                optional(title, "title"),
+                optional(industry, "industry"),
+                optional(country, "country"),
+                revenue,
+                optional(status, "customerStatus"),
+                churn
+        );
     }
 
     private String optional(String value, String name) {
-        if (value.isBlank()) {
+        if (value == null || value.isBlank()) {
             return null;
         }
-        if (value.length() > HEADER_LIMITS.get(name.toLowerCase(Locale.ROOT))) {
-            throw new IllegalArgumentException(name + " is too long");
+        Integer limit = HEADER_LIMITS.get(name.toLowerCase(Locale.ROOT));
+        if (limit != null && value.length() > limit) {
+            return value.substring(0, limit).trim();
         }
-        return value;
+        return value.trim();
     }
 
     private BigDecimal decimal(String raw, String name) {
-        if (raw.isBlank()) {
+        if (raw == null || raw.isBlank()) {
             return null;
         }
         try {
             String cleaned = raw.replaceAll("[$,%\\s]", "");
-            return new BigDecimal(cleaned);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(name + " must be a number");
+            if (cleaned.isBlank() || cleaned.equals("—") || cleaned.equalsIgnoreCase("n/a") || cleaned.equalsIgnoreCase("null")) {
+                return null;
+            }
+            BigDecimal parsed = new BigDecimal(cleaned);
+            if (parsed.signum() < 0) return null;
+            return parsed;
+        } catch (Exception exception) {
+            return null;
         }
     }
 

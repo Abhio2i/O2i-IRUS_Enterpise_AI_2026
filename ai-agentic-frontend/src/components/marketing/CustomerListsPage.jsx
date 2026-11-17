@@ -609,9 +609,9 @@ export const CustomerListsPage = () => {
             <div style={{ padding: '40px 20px', textAlign: 'center' }}>
               <Upload size={30} color="var(--text-muted)" style={{ margin: '0 auto 10px' }} />
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>No Contacts Imported Yet</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 480, margin: '0 auto 16px', lineHeight: 1.5 }}>
-                Upload a UTF-8 CSV with at minimum an <code>email</code> column. Optional columns:
-                firstName, lastName, company, title, industry, country, annualRevenue, customerStatus, churnProbability.
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 540, margin: '0 auto 16px', lineHeight: 1.5 }}>
+                Upload a CSV/TSV directory with at minimum an <code>Email</code> column. Smart columns supported:
+                <code>Organization / Site</code> (Company), <code>Category / Type</code> (Industry), <code>Region / City / Country</code>, <code>Name (First / Last)</code>, <code>Role / Title</code>, <code>Revenue</code>, <code>Status</code>, <code>Churn %</code>.
               </div>
               <button className="btn btn-solid btn-sm" style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff' }} onClick={() => setIsImportOpen(true)}>
                 <Upload size={13} /> Import Contacts CSV
@@ -642,23 +642,25 @@ export const CustomerListsPage = () => {
                           </div>
                           <span style={{ fontWeight: 600, fontSize: 12.5 }}>
                             {c.firstName || ''} {c.lastName || ''}
-                            {!c.firstName && !c.lastName ? '—' : ''}
+                            {!c.firstName && !c.lastName ? (c.company || (c.email?.includes('@') ? c.email.split('@')[0] : '—')) : ''}
                           </span>
                         </div>
                       </td>
                       <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
-                      <td style={{ fontSize: 12 }}>{c.company || '—'}</td>
-                      <td><span className="badge" style={{ fontSize: 10 }}>{c.industry || '—'}</span></td>
-                      <td style={{ fontSize: 12 }}>{c.country || '—'}</td>
+                      <td style={{ fontSize: 12, fontWeight: 500 }}>{c.company || '—'}</td>
+                      <td><span className="badge" style={{ fontSize: 10 }}>{c.industry || (c.title || 'General')}</span></td>
+                      <td style={{ fontSize: 12 }}>{c.country || (c.email?.endsWith('.ca') ? 'Canada' : '—')}</td>
                       <td className="mono" style={{ fontSize: 12 }}>
                         {c.annualRevenue != null ? `$${Number(c.annualRevenue).toLocaleString()}` : '—'}
                       </td>
                       <td>
                         {c.customerStatus ? (
-                          <span className={`badge ${c.customerStatus === 'ACTIVE' ? 'success' : c.customerStatus === 'CHURNED' ? 'danger' : ''}`} style={{ fontSize: 10 }}>
+                          <span className={`badge ${c.customerStatus === 'ACTIVE' ? 'success' : c.customerStatus === 'CHURNED' ? 'danger' : 'warning'}`} style={{ fontSize: 10 }}>
                             {c.customerStatus}
                           </span>
-                        ) : '—'}
+                        ) : (
+                          <span className="badge success" style={{ fontSize: 10 }}>ACTIVE</span>
+                        )}
                       </td>
                       <td className="mono" style={{ fontSize: 12, color: c.churnProbability > 70 ? '#dc2626' : c.churnProbability > 40 ? '#d97706' : 'var(--text-primary)' }}>
                         {c.churnProbability != null ? `${c.churnProbability}%` : '—'}
@@ -865,10 +867,10 @@ export const CustomerListsPage = () => {
                     </div>
                   ) : (
                     <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                      Click to select a <strong>.csv</strong> file
+                      Click to select a <strong>.csv</strong> or <strong>.tsv</strong> file (Excel / Directory Export)
                     </div>
                   )}
-                  <input ref={csvInputRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
+                  <input ref={csvInputRef} type="file" accept=".csv,text/csv,.tsv,text/tab-separated-values,.txt" style={{ display: 'none' }}
                     onChange={e => setCsvFile(e.target.files?.[0] || null)} />
                 </div>
               </div>
