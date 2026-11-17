@@ -1,64 +1,79 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Spring%20Boot-4.1.1-brightgreen?style=for-the-badge&logo=springboot" alt="Spring Boot" />
-  <img src="https://img.shields.io/badge/Java-21%20LTS-orange?style=for-the-badge&logo=openjdk" alt="Java 21" />
-  <img src="https://img.shields.io/badge/React-19.3-blue?style=for-the-badge&logo=react" alt="React 19" />
-  <img src="https://img.shields.io/badge/Vite-8.3-purple?style=for-the-badge&logo=vite" alt="Vite 8" />
-  <img src="https://img.shields.io/badge/MySQL-8.0-blue?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL 8" />
-  <img src="https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/badge/Java-21_LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" />
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-19.3-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Vite-8.3-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Redux_Toolkit-2.13-764ABC?style=for-the-badge&logo=redux&logoColor=white" />
 </p>
 
-# 🤖 Agentic AI Platform
+<h1 align="center">🤖 Agentic AI Platform</h1>
 
-> **Enterprise-grade, multi-pillar AI operations platform** with zero-trust document management, AI-powered marketing automation, strategic planning, HR management, financial intelligence, and sovereign security — all orchestrated through autonomous AI agents.
+<p align="center">
+  <strong>Enterprise-grade autonomous AI operations platform built with Spring Boot 4 and React 19.</strong><br/>
+  Multi-tenant architecture with JWT authentication, AI-powered document processing, marketing automation,<br/>
+  live Google rank tracking, and 50+ UI pages across 6 enterprise pillars.
+</p>
 
----
-
-## 📑 Table of Contents
-
-- [Architecture Overview](#-architecture-overview)
-- [Tech Stack](#-tech-stack)
-- [Platform Pillars](#-platform-pillars--modules)
-- [Project Structure](#-project-structure)
-- [Prerequisites](#-prerequisites)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [API Reference](#-api-reference)
-- [Database Schema](#-database-schema)
-- [Frontend Architecture](#-frontend-architecture)
-- [Security Architecture](#-security-architecture)
-- [AI & ML Integrations](#-ai--ml-integrations)
-- [Deployment](#-deployment)
-- [Contributing](#-contributing)
-- [License](#-license)
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-platform-modules">Modules</a> •
+  <a href="#-api-endpoints">API</a> •
+  <a href="#-database">Database</a> •
+  <a href="#-deployment">Deployment</a>
+</p>
 
 ---
 
-## 🏗 Architecture Overview
+## ✨ Key Highlights
+
+- **🔐 Zero-Trust Auth** — JWT access/refresh tokens, BCrypt password hashing, OAuth2 Resource Server, multi-tenant isolation
+- **📄 AI Document Processing** — Upload any document → Apache Tika extracts text → Regex extracts structured fields with confidence scores → SHA-256 deduplication → Auto-approve or flag to Exception Queue
+- **📧 AI Email Campaigns** — Groq LLM generates personalized outreach emails grounded in your uploaded brochures/catalogs, then sends via SMTP to imported CSV contacts
+- **🔍 Live SEO Rank Tracking** — SerpAPI queries real Google results for your keywords, finds your domain position in top 100 organic results, tracks rank history with deltas
+- **🤖 AI SEO Optimization** — Groq AI generates optimized meta titles, descriptions, H2 headings, and actionable recommendations for each tracked keyword
+- **📊 Customer 360** — Unified customer view with health scores, churn probability, engagement signals, and AI-generated cross-sell/upsell/retention offers
+- **🌗 Dark/Light Theme** — Full CSS variable-based theming with one-click toggle
+- **📱 50+ Pages** — Operations, Marketing, HR, Strategy, Finance, Security modules with dedicated UIs
+
+---
+
+## 🏗 Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     FRONTEND (React 19 + Vite 8)                │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
-│  │ Redux TK │ │ Lucide   │ │ API      │ │  6 Pillar UIs    │   │
-│  │ Store    │ │ React    │ │ Client   │ │  (50+ pages)     │   │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
-│                   Vite Dev Proxy (:5173 → :9095)                │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ REST / JSON
-┌─────────────────────────▼───────────────────────────────────────┐
-│                   BACKEND (Spring Boot 4.1.1)                   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
-│  │ Security │ │ Auth &   │ │ Document │ │ Marketing &      │   │
-│  │ (JWT +   │ │ IAM      │ │ Intake   │ │ Revenue Intel    │   │
-│  │  OAuth2) │ │ (BCrypt) │ │ (Tika)   │ │ (Groq + SerpAPI) │   │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
-│                     Flyway Migrations                           │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ JDBC / JPA
-┌─────────────────────────▼───────────────────────────────────────┐
-│                     MySQL 8.0 (InnoDB)                          │
-│  Multi-tenant schema: dms_*, iam_*, mkt_*                       │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    REACT 19 + VITE 8                        │
+│                                                             │
+│  Redux Toolkit Store ──► 50+ Page Components                │
+│  (10 slices)              (Lucide React Icons)              │
+│                                                             │
+│  API Client (2400+ LOC) ── auto token refresh               │
+│               │                                             │
+│         Vite Dev Proxy                                      │
+│        :5173 → :9095                                        │
+└───────────────┬─────────────────────────────────────────────┘
+                │ REST / JSON
+┌───────────────▼─────────────────────────────────────────────┐
+│                 SPRING BOOT 4.1.1                           │
+│                                                             │
+│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐   │
+│  │  Auth   │  │ Document │  │ Marketing │  │ Security  │   │
+│  │  (JWT)  │  │ Intake   │  │ (Groq AI) │  │ (OAuth2)  │   │
+│  │ BCrypt  │  │ (Tika)   │  │ (SerpAPI) │  │ CORS/CSRF │   │
+│  └─────────┘  └──────────┘  └───────────┘  └───────────┘   │
+│                                                             │
+│  Flyway Migrations (V1–V9) ── JPA/Hibernate ── Validation  │
+└───────────────┬─────────────────────────────────────────────┘
+                │ JDBC
+┌───────────────▼─────────────────────────────────────────────┐
+│              MySQL 8.0 (InnoDB)                             │
+│  Tables: dms_tenants, iam_users, iam_refresh_sessions,      │
+│          dms_documents, dms_document_content,                │
+│          mkt_customer_lists, mkt_contacts,                   │
+│          mkt_proposals, mkt_customer_360_*,                  │
+│          mkt_seo_keywords                                    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -67,275 +82,194 @@
 
 ### Backend
 
-| Technology | Version | Purpose |
-|---|---|---|
-| **Java** | 21 LTS | Runtime & language |
-| **Spring Boot** | 4.1.1 | Application framework |
-| **Spring Security** | 6.x | Authentication & authorization |
-| **Spring Data JPA** | 4.x | ORM & repository abstraction |
-| **Spring OAuth2 Resource Server** | 6.x | JWT-based stateless auth |
-| **Flyway** | 11.x | Database version control & migrations |
-| **MySQL Connector/J** | 8.x | JDBC driver |
-| **Apache Tika** | 3.2.2 | Document text extraction (PDF, DOCX, etc.) |
+| Technology | Version | What it does |
+|:---|:---|:---|
+| **Java** | 21 LTS | Language runtime |
+| **Spring Boot** | 4.1.1 | Web framework, DI, auto-configuration |
+| **Spring Security** | 6.x | Authentication & authorization layer |
+| **Spring Data JPA** | 4.x | ORM with Hibernate, repository pattern |
+| **Spring OAuth2 Resource Server** | 6.x | Stateless JWT token validation |
+| **Spring Mail** | 4.x | SMTP email delivery for campaigns |
+| **Flyway** | 11.x | Database migration versioning (9 scripts) |
+| **MySQL Connector/J** | 8.x | JDBC driver for MySQL |
+| **Apache Tika** | 3.2.2 | PDF/DOCX/image text extraction & OCR |
 | **Apache Commons CSV** | 1.14.1 | CSV parsing for contact imports |
-| **Spring Boot Mail** | 4.x | SMTP email campaigns |
-| **BCrypt** | — | Password hashing |
-| **Maven Wrapper** | 3.x | Build tool (no global install needed) |
+| **BCrypt** | — | Password hashing (60-round) |
+| **Jakarta Validation** | 3.x | Request DTO validation (`@Valid`, `@NotBlank`) |
+| **Maven Wrapper** | 3.x | Build tool (included, no global install) |
 
 ### Frontend
 
-| Technology | Version | Purpose |
-|---|---|---|
-| **React** | 19.3 | UI component framework |
-| **Vite** | 8.3 | Build tool & HMR dev server |
-| **Redux Toolkit** | 2.13 | Global state management |
-| **React Redux** | 9.3 | React bindings for Redux |
-| **Lucide React** | 1.61 | Icon library (200+ icons) |
-| **CSS Variables** | — | Theming (Dark / Light modes) |
+| Technology | Version | What it does |
+|:---|:---|:---|
+| **React** | 19.3 | Component-based UI framework |
+| **Vite** | 8.3 | Dev server with HMR + production bundler |
+| **Redux Toolkit** | 2.13 | Centralized state management (10 slices) |
+| **React Redux** | 9.3 | React bindings for Redux store |
+| **Lucide React** | 1.61 | 200+ SVG icon components |
+| **CSS Custom Properties** | — | Dark/Light theme system |
 
-### Database & Infrastructure
+### External Services
 
-| Technology | Version | Purpose |
-|---|---|---|
-| **MySQL** | 8.0 | Primary relational database |
-| **InnoDB** | — | Transactional storage engine |
-| **Flyway** | — | 9 versioned migration scripts |
-
-### External AI / API Services
-
-| Service | Purpose |
-|---|---|
-| **Groq API** (LLM) | AI content generation — email drafts, SEO recommendations, proposals, contact selection |
-| **SerpAPI** | Live Google SERP rank tracking for SEO keywords |
-| **SMTP Provider** | Transactional & marketing email delivery |
+| Service | What it does |
+|:---|:---|
+| **Groq Cloud API** | LLM for email drafts, SEO tips, proposals, contact scoring |
+| **SerpAPI** | Live Google search rank tracking |
+| **SMTP Server** | Email campaign delivery |
 
 ---
 
-## 🏛 Platform Pillars & Modules
+## 📦 Platform Modules
 
-The platform is organized into **6 enterprise pillars**, each powered by autonomous AI agents:
+The platform has **6 pillars** with **43+ routes** and **50+ page components**:
 
-### Pillar 1 — Operations (Process Automation)
-| Module | Description |
-|---|---|
-| **Projects** | Project portfolio management dashboard |
-| **Status** | Real-time operational status monitoring |
+### Pillar 1 — ⚙️ Operations (Process Automation)
+
+| Page | What it does |
+|:---|:---|
+| **Document Intake** | Upload documents → Tika text extraction → field extraction with confidence scores → SHA-256 dedup → auto-approve or flag to Exception Queue |
+| **Exception Queue** | Review flagged documents with reasons (low confidence, over limit, duplicate) |
+| **Process Mining** | Discover process bottlenecks and optimization opportunities |
+| **Knowledge Assistant** | AI knowledge base and Q&A |
+| **Projects** | Project portfolio dashboard |
+| **Status** | Real-time operational monitoring |
 | **Planner & Team** | Resource planning and team allocation |
-| **Docs & Security** | Document security classification and access control |
 | **Workflow Improvements** | AI-suggested process optimizations |
-| **Exception Queue** | Anomaly detection and exception handling with prioritization |
-| **Document Intake** | Zero-trust document ingestion with AI text extraction (Apache Tika), field extraction, confidence scoring, SHA-256 deduplication |
-| **Process Mining** | Process bottleneck discovery and optimization |
-| **Knowledge Assistant** | AI-powered knowledge base and Q&A |
 | **Automated Reports** | Scheduled intelligence reports |
+| **Docs & Security** | Document classification and access control |
 
-### Pillar 2 — HR & People (Team Value)
-| Module | Description |
-|---|---|
+### Pillar 2 — 👥 HR & People
+
+| Page | What it does |
+|:---|:---|
 | **Person Identification** | Identity verification and profiling |
 | **AI On-Call Interview** | Automated candidate screening |
-| **Offer Letters** | AI-generated offer letter drafting |
-| **Policies** | HR policy management and compliance |
+| **Offer Letters** | AI-drafted employment offers |
 | **Salary Disbursement** | Payroll processing dashboard |
-| **Experience Letters** | Automated experience certificate generation |
-| **Documentation** | Employee documentation vault |
+| **Experience Letters** | Automated certificate generation |
+| **Policies & Documentation** | HR policy and employee document vault |
 
-### Pillar 3 — Marketing (Revenue Intelligence)
-| Module | Description |
-|---|---|
-| **Lead Management** | Lead capture, scoring, and pipeline tracking |
-| **Proposals** | AI-generated business proposals using Groq LLM |
-| **Customer Lists** | AI-segmented customer lists with CSV import, Groq AI contact selection |
+### Pillar 3 — 📢 Marketing (Revenue Intelligence)
+
+| Page | What it does |
+|:---|:---|
+| **Email Sender (Content Studio)** | 3-step flow: Select audience (domain/list/direct) → AI-generate email (Groq + brochure grounding) → Send via SMTP with personalization tokens (`{{firstName}}`, `{{company}}`) |
+| **SEO Keywords** | Track keywords with live Google rank via SerpAPI. Click "Optimize" → Groq AI generates meta title, description, H2 headings, and actionable SEO checklist. "Check Rank" re-fetches live position. "Sweep" updates all keywords at once |
+| **Customer Lists** | Import contacts via CSV (email, company, industry, revenue, churn probability). Create AI-segmented lists with Groq-powered contact selection |
+| **Customer 360** | Unified account view with Tier (1-4), ARR, health score, churn probability. Engagement signals (usage, API telemetry, portal analytics). AI-generated offers (cross-sell, upsell, retention) |
+| **Proposals** | AI-generated business proposals using Groq LLM. Pipeline tracking: Draft → Sent → Under Review → Negotiation → Accepted/Rejected. Send proposals via email |
+| **Brochures & Catalogs** | Upload marketing assets (PDF, images). Used as factual grounding source for AI email generation |
+| **Lead Management** | Lead capture, scoring, pipeline tracking |
 | **Recommendations** | AI confidence-ranked engagement strategies |
-| **Brochures & Catalogs** | Marketing asset management with file upload/preview/download |
-| **SEO Keywords** | Live Google rank tracking (SerpAPI) + Groq AI optimization |
-| **Email Sender** (Content Studio) | Groq AI email generation with SMTP delivery, brochure-grounded content |
-| **Customer 360** | Unified customer view with health scores, signals, and AI-generated offers |
 | **Predictive Scoring** | Churn prediction and revenue forecasting |
 | **Attribution & ROI** | Multi-touch attribution modeling |
 
-### Pillar 4 — Leadership & Strategy (Strategic Excellence)
-| Module | Description |
-|---|---|
+### Pillar 4 — 🧭 Leadership & Strategy
+
+| Page | What it does |
+|:---|:---|
 | **Goals & Sub-Goals** | OKR-style goal tracking |
 | **Strategic Timelines** | Gantt-style strategic planning |
 | **Plan of Action** | Actionable strategic roadmaps |
 | **Policies** | Organizational policy management |
 
-### Pillar 5 — Finance & Capital (Enterprise Settlement)
-| Module | Description |
-|---|---|
+### Pillar 5 — 💰 Finance & Capital
+
+| Page | What it does |
+|:---|:---|
 | **Single Dashboard** | Unified financial overview |
 | **Revenues (Projects)** | Project-wise revenue tracking |
 | **Expenses & Costs** | Cost management and budgeting |
-| **Taxes & Compliance** | Tax calculation and compliance tracking |
+| **Taxes & Compliance** | Tax calculation and compliance |
 | **Projections & Planning** | Financial forecasting and scenario planning |
 
-### Pillar 6 — Security & Defense (Sovereign Shield)
-| Module | Description |
-|---|---|
+### Pillar 6 — 🛡 Security & Defense
+
+| Page | What it does |
+|:---|:---|
 | **Command Center** | Security overview and threat dashboard |
 | **Data Security** | Data classification and protection policies |
 | **IP Security** | Intellectual property monitoring |
 | **Personnel Safety** | Employee security protocols |
 | **Equipment Security** | Asset tracking and protection |
 | **Infrastructure** | Infrastructure hardening status |
-| **Sentry Console** | Real-time security event monitoring (port 9090) |
-
----
-
-## 📁 Project Structure
-
-```
-Agentic-Ai-new/
-├── agentic-ai-platform/              # ☕ Spring Boot Backend
-│   ├── src/main/java/com/example/agentic_ai_platform/
-│   │   ├── AgenticAiPlatformApplication.java
-│   │   ├── auth/                     # Authentication & IAM
-│   │   │   ├── controller/           # AuthController (register, login, refresh, logout)
-│   │   │   ├── dto/                  # AuthRequests, AuthResponse, AuthUserResponse
-│   │   │   ├── entity/               # PlatformUser, RefreshSession, Tenant
-│   │   │   ├── repository/           # JPA repositories
-│   │   │   └── service/              # AuthService (BCrypt + JWT)
-│   │   ├── common/
-│   │   │   └── controller/           # ApiExceptionHandler (global error handling)
-│   │   ├── documents/                # Document Intake Module
-│   │   │   ├── controller/           # DocumentIntakeController
-│   │   │   ├── dto/                  # DocumentResponse, DocumentFileResponse
-│   │   │   ├── entity/               # Document, DocumentContent
-│   │   │   ├── repository/           # DocumentRepository, DocumentContentRepository
-│   │   │   ├── service/              # DocumentIntakeService (interface)
-│   │   │   └── serviceimpl/          # DocumentIntakeServiceImpl (Tika integration)
-│   │   ├── marketing/                # Marketing & Revenue Intelligence
-│   │   │   ├── controller/           # Customer360, CustomerLists, Contacts, SEO, Proposals, Assets, Campaigns
-│   │   │   ├── dto/                  # Request/Response DTOs
-│   │   │   ├── entity/               # JPA entities (SeoKeyword, MarketingProposal, Customer360*, etc.)
-│   │   │   ├── repository/           # Spring Data JPA repositories
-│   │   │   ├── service/              # Service interfaces
-│   │   │   └── serviceimpl/          # GoogleSerpRankService, GroqContentGenerator, GroqContactSelector
-│   │   └── security/                 # Security Configuration
-│   │       ├── SecurityConfig.java   # CORS, CSRF, OAuth2 Resource Server, BCrypt
-│   │       └── jwt/                  # JwtConfig, JwtService, JwtCookieService
-│   ├── src/main/resources/
-│   │   ├── application.properties    # Externalized configuration with env var binding
-│   │   ├── db/migration/             # Flyway SQL migrations (V1–V9)
-│   │   ├── static/                   # Legacy static UI (index.html, css/, js/)
-│   │   └── templates/                # Thymeleaf templates (if any)
-│   ├── scripts/
-│   │   └── create-local-database.sql # MySQL database creation script
-│   ├── postman/
-│   │   └── agentic-ai-platform.postman_collection.json  # Complete API test collection
-│   ├── .env.example                  # Environment variable template
-│   ├── pom.xml                       # Maven project configuration
-│   ├── mvnw / mvnw.cmd              # Maven Wrapper (no global Maven needed)
-│   └── .gitignore
-│
-├── ai-agentic-frontend/              # ⚛️ React Frontend
-│   ├── src/
-│   │   ├── main.jsx                  # React entry point with Redux Provider
-│   │   ├── App.jsx                   # Root component with PageRouter & auth gate
-│   │   ├── App.css                   # Component styles
-│   │   ├── index.css                 # Global styles & CSS variable theming
-│   │   ├── components/
-│   │   │   ├── Sidebar.jsx           # 6-pillar navigation with live/plan badges
-│   │   │   ├── Topbar.jsx            # Breadcrumb navigation bar
-│   │   │   ├── Header.jsx            # App header
-│   │   │   ├── AgentSelector.jsx     # AI agent selection component
-│   │   │   ├── GovernanceDrawer.jsx  # Governance & compliance slide-out
-│   │   │   ├── GovernanceAuditDrawer.jsx
-│   │   │   ├── auth/                 # LoginPage
-│   │   │   ├── common/               # AgentRoadmapModal, AuthModal
-│   │   │   ├── operations/           # 10 operation page components
-│   │   │   ├── marketing/            # 10 marketing page components
-│   │   │   ├── strategy/             # 4 strategy page components
-│   │   │   ├── hr/                   # 7 HR page components
-│   │   │   ├── finance/              # 5 finance page components
-│   │   │   └── security/             # 7 security page components
-│   │   ├── services/
-│   │   │   └── apiClient.js          # Centralized API client (2400+ lines, auto token refresh)
-│   │   ├── store/                    # Redux Toolkit slices
-│   │   │   ├── index.js              # Store configuration
-│   │   │   ├── authSlice.js          # Authentication state
-│   │   │   ├── marketingSlice.js     # Marketing module state
-│   │   │   ├── operationsSlice.js    # Operations module state
-│   │   │   ├── navigationSlice.js    # Routing & sidebar state
-│   │   │   ├── financeSlice.js       # Finance module state
-│   │   │   ├── hrSlice.js            # HR module state
-│   │   │   ├── securitySlice.js      # Security module state
-│   │   │   ├── strategySlice.js      # Strategy module state
-│   │   │   ├── governanceSlice.js    # Governance & audit state
-│   │   │   └── themeSlice.js         # Dark/Light theme state
-│   │   └── assets/                   # Static assets (images, SVGs)
-│   ├── public/
-│   │   ├── favicon.svg
-│   │   ├── icons.svg
-│   │   └── _redirects                # SPA routing for Netlify/CDN deployment
-│   ├── vite.config.js                # Vite config with API proxy
-│   ├── package.json
-│   ├── .env                          # VITE_BACKEND_URL
-│   └── .gitignore
-│
-└── README.md                         # ← You are here
-```
+| **Sentry Console** | Live camera feed monitoring, incident detection (connects to external Sentry server on port 9090) |
 
 ---
 
 ## 📋 Prerequisites
 
-| Requirement | Version | Check |
-|---|---|---|
-| **Java JDK** | 21+ | `java -version` |
-| **Node.js** | 20+ | `node -v` |
-| **npm** | 10+ | `npm -v` |
-| **MySQL Server** | 8.0+ | `mysql --version` |
-| **Git** | 2.x+ | `git --version` |
+| Tool | Version | Verify |
+|:---|:---|:---|
+| Java JDK | 21+ | `java -version` |
+| Node.js | 20+ | `node -v` |
+| npm | 10+ | `npm -v` |
+| MySQL Server | 8.0+ | `mysql --version` |
+| Git | 2.x+ | `git --version` |
 
-> **Note:** Maven is NOT required globally — the project includes Maven Wrapper (`mvnw` / `mvnw.cmd`).
+> Maven is **not** required globally — the project ships with Maven Wrapper (`mvnw` / `mvnw.cmd`).
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
-### 1. Clone the Repository
+### 1️⃣ Clone
 
 ```bash
 git clone https://github.com/Abhio2i/Agentic-Ai-new.git
 cd Agentic-Ai-new
 ```
 
-### 2. Set Up MySQL Database
+### 2️⃣ Create the MySQL database
 
 ```sql
--- Connect to MySQL as root
 mysql -u root -p
-
--- Create the database
-CREATE DATABASE IF NOT EXISTS agentic_ai_platform
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_0900_ai_ci;
 ```
 
-### 3. Configure Backend Environment
+```sql
+CREATE DATABASE IF NOT EXISTS agentic_ai_platform
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+```
+
+### 3️⃣ Configure backend environment
 
 ```bash
 cd agentic-ai-platform
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials:
+Edit `.env`:
 
-```properties
+```env
+# ── Required ──────────────────────────────────────
 DATABASE_URL=jdbc:mysql://localhost:3306/agentic_ai_platform
 DATABASE_USERNAME=root
 DATABASE_PASSWORD=your-mysql-password
-JWT_SECRET_BASE64=<run: openssl rand -base64 32>
+
+# Generate: openssl rand -base64 32
+JWT_SECRET_BASE64=your-generated-secret-here
+
 AUTH_REGISTRATION_ENABLED=true
 AUTH_COOKIE_SECURE=false
-GROQ_API_KEY=your-groq-api-key        # Optional: enables AI features
-SERPAPI_API_KEY=your-serpapi-key        # Optional: enables live SEO ranking
+
+# ── Optional (AI features) ───────────────────────
+GROQ_API_KEY=your-groq-api-key
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_BASE_URL=https://api.groq.com/openai/v1
+
+# ── Optional (Live SEO ranking) ──────────────────
+SERPAPI_API_KEY=your-serpapi-key
+
+# ── Optional (Email campaigns) ───────────────────
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=you@example.com
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM=you@example.com
 ```
 
-### 4. Start the Backend
+### 4️⃣ Start the backend
 
 ```bash
 # Windows
@@ -345,9 +279,9 @@ SERPAPI_API_KEY=your-serpapi-key        # Optional: enables live SEO ranking
 ./mvnw spring-boot:run
 ```
 
-Flyway will automatically run all 9 database migrations on first startup. The backend starts on **http://localhost:9095**.
+> Flyway automatically runs all 9 migrations on first startup. Backend starts at **http://localhost:9095**
 
-### 5. Start the Frontend
+### 5️⃣ Start the frontend
 
 ```bash
 cd ../ai-agentic-frontend
@@ -355,11 +289,11 @@ npm install
 npm run dev
 ```
 
-The frontend starts on **http://localhost:5173** with API proxy to the backend.
+> Frontend starts at **http://localhost:5173** with API proxy to backend.
 
-### 6. Access the Platform
+### 6️⃣ Open & Register
 
-Open **http://localhost:5173** in your browser and register a new account.
+Go to **http://localhost:5173**, register a new account, and start using the platform.
 
 ---
 
@@ -368,221 +302,285 @@ Open **http://localhost:5173** in your browser and register a new account.
 ### Backend (`agentic-ai-platform/.env`)
 
 | Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_URL` | ✅ | `jdbc:mysql://localhost:3306/agentic_ai_platform` | JDBC connection string |
+|:---|:---:|:---|:---|
+| `DATABASE_URL` | ✅ | `jdbc:mysql://localhost:3306/agentic_ai_platform` | JDBC connection URL |
 | `DATABASE_USERNAME` | ✅ | `root` | MySQL username |
 | `DATABASE_PASSWORD` | ✅ | — | MySQL password |
-| `JWT_SECRET_BASE64` | ✅ | — | Base64-encoded JWT signing key |
-| `AUTH_REGISTRATION_ENABLED` | ❌ | `false` | Enable/disable user registration |
-| `AUTH_COOKIE_SECURE` | ❌ | `true` | Set `false` for local HTTP dev |
-| `GROQ_API_KEY` | ❌ | — | Groq Cloud API key for AI features |
-| `GROQ_MODEL` | ❌ | `openai/gpt-oss-120b` | LLM model identifier |
-| `GROQ_BASE_URL` | ❌ | `https://api.groq.com/openai/v1` | Groq API base URL |
-| `SMTP_HOST` | ❌ | — | SMTP server hostname |
-| `SMTP_PORT` | ❌ | `587` | SMTP port |
-| `SMTP_USERNAME` | ❌ | — | SMTP auth username |
-| `SMTP_PASSWORD` | ❌ | — | SMTP auth password |
-| `SMTP_AUTH` | ❌ | `true` | Enable SMTP authentication |
-| `SMTP_STARTTLS` | ❌ | `true` | Enable STARTTLS |
-| `SMTP_SSL` | ❌ | `false` | Enable SSL (for port 465) |
-| `SMTP_FROM` | ❌ | — | Default sender email |
-| `SMTP_ALLOWED_FROM` | ❌ | — | Comma-separated allowed sender emails |
-| `SERPAPI_API_KEY` | ❌ | — | SerpAPI key for live Google rank tracking |
-| `SERPAPI_ENGINE` | ❌ | `google` | Search engine type |
-| `SERPAPI_GL` | ❌ | `us` | Geolocation for search results |
-| `SERPAPI_HL` | ❌ | `en` | Language for search results |
+| `JWT_SECRET_BASE64` | ✅ | — | Base64 JWT signing key (`openssl rand -base64 32`) |
+| `AUTH_REGISTRATION_ENABLED` | | `false` | Allow new user registration |
+| `AUTH_COOKIE_SECURE` | | `true` | `false` for local HTTP development |
+| `SERVER_PORT` | | `9095` | HTTP port |
+| `GROQ_API_KEY` | | — | Groq Cloud API key (enables AI features) |
+| `GROQ_MODEL` | | `openai/gpt-oss-120b` | LLM model name |
+| `GROQ_BASE_URL` | | `https://api.groq.com/openai/v1` | Groq API base URL |
+| `SERPAPI_API_KEY` | | — | SerpAPI key (enables live Google rank tracking) |
+| `SERPAPI_ENGINE` | | `google` | Search engine |
+| `SERPAPI_GL` | | `us` | Country for search results |
+| `SERPAPI_HL` | | `en` | Language for search results |
+| `SMTP_HOST` | | — | Mail server hostname |
+| `SMTP_PORT` | | `587` | Mail server port |
+| `SMTP_USERNAME` | | — | SMTP auth username |
+| `SMTP_PASSWORD` | | — | SMTP auth password |
+| `SMTP_AUTH` | | `true` | Enable SMTP authentication |
+| `SMTP_STARTTLS` | | `true` | Enable STARTTLS |
+| `SMTP_SSL` | | `false` | Enable SSL (port 465) |
+| `SMTP_FROM` | | — | Default sender email |
+| `SMTP_ALLOWED_FROM` | | — | Comma-separated allowed senders |
 
 ### Frontend (`ai-agentic-frontend/.env`)
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `VITE_BACKEND_URL` | ❌ | `http://localhost:9095` | Backend API URL |
+| Variable | Default | Description |
+|:---|:---|:---|
+| `VITE_BACKEND_URL` | `http://localhost:9095` | Backend API URL |
 
 ---
 
-## 📡 API Reference
+## 📡 API Endpoints
 
-The backend exposes a RESTful JSON API. A complete **Postman Collection** is included at:
+A complete **Postman Collection** is included:  
+📁 `agentic-ai-platform/postman/agentic-ai-platform.postman_collection.json`
+
+### Authentication
+
+| Method | Endpoint | Description | Status |
+|:---|:---|:---|:---|
+| `POST` | `/api/auth/register` | Register user (tenantId, email, password, displayName) | `201` |
+| `POST` | `/api/auth/login` | Login → returns accessToken + refreshToken | `200` |
+| `POST` | `/api/auth/refresh` | Refresh access token | `200` |
+| `POST` | `/api/auth/logout` | Revoke refresh token | `204` |
+
+### Document Intake 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `POST` | `/api/documents/intake` | Upload file (multipart) → Tika extraction → field parsing → store |
+| `GET` | `/api/documents` | List all ingested documents |
+| `GET` | `/api/documents/:id` | Get document metadata + extracted fields + confidence scores |
+| `GET` | `/api/documents/:id/content` | Download original file |
+| `DELETE` | `/api/documents/:id` | Delete document |
+
+### Marketing — Contacts 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `POST` | `/api/marketing/contacts/import` | Import contacts from CSV file |
+| `GET` | `/api/marketing/contacts` | List all imported contacts |
+| `GET` | `/api/marketing/contacts/by-domain?domain=x` | Filter contacts by email domain |
+
+### Marketing — Customer Lists 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/api/marketing/customer-lists` | List all customer lists |
+| `POST` | `/api/marketing/customer-lists` | Create customer list |
+| `PUT` | `/api/marketing/customer-lists/:id` | Update customer list |
+| `DELETE` | `/api/marketing/customer-lists/:id` | Delete customer list |
+| `GET` | `/api/marketing/customer-lists/:id/contacts` | Get list members |
+| `POST` | `/api/marketing/customer-lists/:id/generate` | AI-generate contact list (Groq) |
+
+### Marketing — SEO Keywords 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/api/marketing/seo/config` | Provider status (live vs demo) |
+| `GET` | `/api/marketing/seo/keywords` | List tracked keywords |
+| `POST` | `/api/marketing/seo/keywords` | Add keyword (auto-fetches live rank) |
+| `DELETE` | `/api/marketing/seo/keywords/:id` | Remove keyword |
+| `POST` | `/api/marketing/seo/keywords/:id/optimize` | AI optimization (Groq → meta title, desc, headings, tips) |
+| `POST` | `/api/marketing/seo/keywords/:id/check-rank` | Re-fetch live Google rank (SerpAPI) |
+| `POST` | `/api/marketing/seo/sweep` | Bulk refresh all keyword ranks |
+
+### Marketing — Proposals 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/api/marketing/proposals` | List proposals |
+| `POST` | `/api/marketing/proposals` | Create proposal |
+| `POST` | `/api/marketing/proposals/generate` | AI-generate proposal (Groq) |
+| `PUT` | `/api/marketing/proposals/:id` | Update proposal |
+| `POST` | `/api/marketing/proposals/:id/send` | Email proposal to client |
+| `GET` | `/api/marketing/proposals/pipeline` | Pipeline stats |
+
+### Marketing — Email Campaigns 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `POST` | `/api/marketing/campaigns/generate-email` | AI email draft (Groq + brochure grounding) |
+| `POST` | `/api/marketing/campaigns/send` | Send bulk email campaign via SMTP |
+| `GET` | `/api/marketing/campaigns` | List sent campaigns |
+| `GET` | `/api/marketing/campaigns/senders` | Get allowed sender addresses |
+
+### Marketing — Assets 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `POST` | `/api/marketing/assets` | Upload brochure/catalog (multipart) |
+| `GET` | `/api/marketing/assets` | List assets |
+| `GET` | `/api/marketing/assets/:id/preview` | Preview asset |
+| `GET` | `/api/marketing/assets/:id/download` | Download asset |
+| `DELETE` | `/api/marketing/assets/:id` | Delete asset |
+
+### Customer 360 🔒
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/api/marketing/customer-360/accounts` | List accounts with health scores |
+| `POST` | `/api/marketing/customer-360/accounts` | Create account |
+| `PUT` | `/api/marketing/customer-360/accounts/:id` | Update account |
+| `GET` | `/api/marketing/customer-360/accounts/:id/signals` | Get engagement signals |
+| `POST` | `/api/marketing/customer-360/accounts/:id/signals` | Add signal |
+| `GET` | `/api/marketing/customer-360/accounts/:id/offers` | Get AI offers |
+| `POST` | `/api/marketing/customer-360/accounts/:id/offers` | Add offer |
+
+> 🔒 = Requires `Authorization: Bearer <accessToken>` header
+
+---
+
+## 🗄 Database
+
+**9 Flyway migrations** manage the schema automatically:
+
+| # | File | Tables Created |
+|:---|:---|:---|
+| V1 | `create_identity_schema` | `dms_tenants`, `iam_users`, `iam_refresh_sessions` |
+| V2 | `create_document_intake` | `dms_documents` (extracted text, fields, confidence, SHA-256) |
+| V3 | `seed_local_development_tenant` | Seeds default tenant `11111111-...` |
+| V4 | `store_original_document_content` | `dms_document_content` (LONGBLOB) |
+| V5 | `create_marketing_customer_lists` | `mkt_customer_lists` |
+| V6 | `create_marketing_contacts` | `mkt_contacts`, `mkt_customer_list_contacts` (join table) |
+| V7 | `create_marketing_proposals` | `mkt_proposals` |
+| V8 | `create_customer_360` | `mkt_customer_360_accounts`, `_signals`, `_offers` |
+| V9 | `create_seo_keywords` | `mkt_seo_keywords` (rank history, difficulty, intent) |
+
+**Design patterns:**
+- **Multi-tenant** — Every table has `tenant_id` (UUID) with FK to `dms_tenants`
+- **UUIDs** — `BINARY(16)` primary keys for distributed compatibility
+- **Microsecond timestamps** — `TIMESTAMP(6)` for all date fields
+- **CHECK constraints** — Rank > 0, difficulty 0–100, revenue ≥ 0, etc.
+- **Composite indexes** — On `(tenant_id, keyword)`, `(tenant_id, created_at)`, etc.
+
+---
+
+## 🔐 Security
+
+| Layer | Implementation |
+|:---|:---|
+| **Authentication** | JWT (HMAC-SHA) — 15-minute access + 30-day refresh tokens |
+| **Password Storage** | BCrypt via Spring Security `BCryptPasswordEncoder` |
+| **Authorization** | OAuth2 Resource Server with role-based access (`USER`, `ADMIN`) |
+| **Sessions** | Fully stateless (`SessionCreationPolicy.STATELESS`) |
+| **CORS** | Allowlisted origins with credentials support |
+| **Multi-tenancy** | `tenant_id` extracted from JWT claims on every request |
+| **Document Integrity** | SHA-256 content hashing for deduplication & tamper detection |
+| **Input Validation** | Jakarta Bean Validation (`@Valid`) on all request DTOs |
+| **Token Refresh** | Frontend API client auto-refreshes on 401 responses |
+
+---
+
+## 🤖 AI Features (How they work)
+
+### Groq LLM Integration
+
+| Feature | Input | Output |
+|:---|:---|:---|
+| **SEO Optimization** | Keyword + target URL + intent | Meta title (60 chars), meta description (155 chars), 3 H2 headings, 3 recommendations |
+| **Email Generation** | Domain + industry + tone + topic + brochure text | Subject line, HTML body, plain text (personalized with `{{firstName}}`, `{{company}}`) |
+| **Proposal Generation** | Client name + services + custom instructions | Full proposal document with sections |
+| **Contact Selection** | Contact list + campaign criteria | Filtered and scored contact subset |
+
+### SerpAPI Integration
+
+| Feature | How it works |
+|:---|:---|
+| **Rank Tracking** | Queries `serpapi.com/search.json` with `num=100` for real Google results |
+| **Domain Matching** | Scans `organic_results[].link`, `displayed_link`, `source` for your domain |
+| **Rank History** | Stores `current_rank` and `previous_rank`, calculates delta |
+| **101 = Not Found** | If domain isn't in top 100, rank is set to 101 |
+| **Bulk Sweep** | Updates all tracked keywords in one operation |
+
+---
+
+## 📁 Project Structure
 
 ```
-agentic-ai-platform/postman/agentic-ai-platform.postman_collection.json
+Agentic-Ai-new/
+│
+├── agentic-ai-platform/           # ☕ Spring Boot Backend (Java 21)
+│   ├── src/main/java/.../
+│   │   ├── auth/                   #   JWT auth (register, login, refresh, logout)
+│   │   ├── documents/              #   Document intake (Tika, SHA-256, field extraction)
+│   │   ├── marketing/              #   Customer lists, contacts, SEO, proposals,
+│   │   │                           #   campaigns, assets, Customer 360
+│   │   ├── security/               #   SecurityConfig, JWT service, CORS
+│   │   └── common/                 #   Global exception handler
+│   ├── src/main/resources/
+│   │   ├── application.properties  #   Config with ${ENV_VAR} binding
+│   │   └── db/migration/           #   9 Flyway SQL scripts
+│   ├── postman/                    #   Complete API test collection
+│   ├── scripts/                    #   create-local-database.sql
+│   ├── .env.example                #   Environment template
+│   ├── pom.xml                     #   Maven dependencies
+│   └── mvnw / mvnw.cmd            #   Maven Wrapper
+│
+├── ai-agentic-frontend/            # ⚛️ React Frontend (Vite)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── auth/               #   Login/Register page
+│   │   │   ├── operations/         #   10 operation page components
+│   │   │   ├── marketing/          #   10 marketing page components
+│   │   │   ├── hr/                 #   7 HR page components
+│   │   │   ├── strategy/           #   4 strategy page components
+│   │   │   ├── finance/            #   5 finance page components
+│   │   │   ├── security/           #   7 security page components
+│   │   │   └── common/             #   Shared modals, drawers
+│   │   ├── services/
+│   │   │   └── apiClient.js        #   Centralized API client (2400+ LOC)
+│   │   ├── store/                  #   Redux Toolkit (10 slices)
+│   │   └── App.jsx                 #   Root with PageRouter (43+ routes)
+│   ├── vite.config.js              #   Vite + API proxy config
+│   └── package.json
+│
+└── README.md
 ```
-
-### Authentication Endpoints
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | Register new user | ❌ |
-| `POST` | `/api/auth/login` | Login & get tokens | ❌ |
-| `POST` | `/api/auth/refresh` | Refresh JWT access token | ❌ |
-| `POST` | `/api/auth/logout` | Revoke refresh token | ❌ |
-
-### Document Intake Endpoints
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/documents/intake` | Upload & process document | ✅ Bearer |
-| `GET` | `/api/documents` | List all documents | ✅ Bearer |
-| `GET` | `/api/documents/:id` | Get document metadata | ✅ Bearer |
-| `GET` | `/api/documents/:id/content` | Download original file | ✅ Bearer |
-| `DELETE` | `/api/documents/:id` | Delete document | ✅ Bearer |
-
-### Marketing Endpoints
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/api/marketing/contacts/import` | Import contacts CSV | ✅ Bearer |
-| `GET` | `/api/marketing/contacts` | List contacts | ✅ Bearer |
-| `GET/POST/PUT/DELETE` | `/api/marketing/customer-lists/**` | Customer list CRUD | ✅ Bearer |
-| `POST` | `/api/marketing/customer-lists/:id/generate` | AI-generate contact list | ✅ Bearer |
-| `GET/POST/DELETE` | `/api/marketing/seo/keywords/**` | SEO keyword CRUD | ✅ Bearer |
-| `POST` | `/api/marketing/seo/keywords/:id/optimize` | AI SEO optimization | ✅ Bearer |
-| `POST` | `/api/marketing/seo/keywords/:id/check-rank` | Live Google rank check | ✅ Bearer |
-| `POST` | `/api/marketing/seo/sweep` | Bulk rank refresh | ✅ Bearer |
-| `GET` | `/api/marketing/seo/config` | SEO provider status | ✅ Bearer |
-| `GET/POST/DELETE` | `/api/marketing/proposals/**` | Proposal CRUD | ✅ Bearer |
-| `GET/POST/DELETE` | `/api/marketing/assets/**` | Marketing asset management | ✅ Bearer |
-| `GET` | `/api/marketing/customer-360/**` | Customer 360 views | ✅ Bearer |
-| `POST` | `/api/marketing/campaigns/send` | Send email campaign | ✅ Bearer |
-
----
-
-## 🗄 Database Schema
-
-The database is managed through **9 Flyway migrations** running in order:
-
-| Migration | Tables Created | Purpose |
-|---|---|---|
-| **V1** | `dms_tenants`, `iam_users`, `iam_refresh_sessions` | Multi-tenant identity & auth |
-| **V2** | `dms_documents` | Document intake with extracted text, fields, confidence |
-| **V3** | — (seed data) | Local development tenant seed |
-| **V4** | `dms_document_content` | Original file binary storage (LONGBLOB) |
-| **V5** | `mkt_customer_lists` | Marketing customer list management |
-| **V6** | `mkt_contacts`, `mkt_customer_list_contacts` | Contact management with join table |
-| **V7** | `mkt_proposals` | AI-generated marketing proposals |
-| **V8** | `mkt_customer_360_accounts`, `mkt_customer_360_signals`, `mkt_customer_360_offers` | Customer 360 analytics |
-| **V9** | `mkt_seo_keywords` | SEO keyword tracking with rank history |
-
-### Key Design Decisions
-
-- **Multi-tenancy:** Every table includes `tenant_id` (BINARY(16) UUID) with foreign key to `dms_tenants`
-- **UUIDs as Primary Keys:** All IDs are BINARY(16) UUIDs for distributed-system compatibility
-- **Timestamps:** TIMESTAMP(6) with microsecond precision
-- **Constraints:** CHECK constraints enforce data integrity (ranks > 0, difficulty 0–100, etc.)
-- **Indexes:** Composite indexes on tenant + frequently-queried columns
-
----
-
-## 🎨 Frontend Architecture
-
-### State Management (Redux Toolkit)
-
-```
-Redux Store
-├── authSlice          → JWT tokens, user profile, login state
-├── navigationSlice    → Active route, sidebar state, org config
-├── themeSlice         → Dark/Light mode
-├── operationsSlice    → Projects, exceptions, documents, workflows
-├── marketingSlice     → Leads, contacts, lists, SEO, proposals
-├── strategySlice      → Goals, timelines, action plans
-├── financeSlice       → Revenue, expenses, taxes, projections
-├── hrSlice            → Employees, interviews, payroll
-├── securitySlice      → Threat data, security events
-└── governanceSlice    → Audit logs, compliance data
-```
-
-### Routing
-
-The app uses a **Redux-driven client-side router** (no React Router dependency). The `PageRouter` component switches views based on `navigationSlice.activeRoute`, supporting 43+ unique routes across all 6 pillars.
-
-### Theming
-
-- **CSS Custom Properties** for consistent design tokens
-- **Dark / Light mode** toggle persisted in Redux
-- Applied via `data-theme` attribute on the root element
-
-### API Client
-
-A centralized `apiClient.js` (2,400+ lines) provides:
-- Automatic JWT Bearer token injection
-- Transparent token refresh on 401 responses
-- User-friendly error message parsing
-- Configurable backend URL (env, localStorage override, hostname auto-detect)
-
----
-
-## 🔐 Security Architecture
-
-| Layer | Technology | Implementation |
-|---|---|---|
-| **Authentication** | JWT (HMAC-SHA) | Stateless Bearer tokens, 15-min access + 30-day refresh |
-| **Password Storage** | BCrypt | Spring Security `BCryptPasswordEncoder` |
-| **Authorization** | Spring Security + OAuth2 Resource Server | Role-based access control (`USER`, `ADMIN`) |
-| **Session Management** | Stateless | `SessionCreationPolicy.STATELESS` — no server-side sessions |
-| **CORS** | Spring CORS Config | Allowlisted origins with credentials support |
-| **CSRF** | Disabled | Safe for stateless JWT APIs |
-| **Multi-tenancy** | Tenant ID in JWT claims | Extracted from `tenant_id` claim on every request |
-| **Document Integrity** | SHA-256 | Content hashing for deduplication and tamper detection |
-| **Input Validation** | Jakarta Bean Validation | `@Valid` on all request DTOs |
-
----
-
-## 🤖 AI & ML Integrations
-
-### Groq LLM (via OpenAI-compatible API)
-
-| Feature | Prompt Strategy | Output |
-|---|---|---|
-| **SEO Optimization** | Keyword + target page + intent → structured JSON | Meta title, meta description, H2 headings, recommendations |
-| **Email Generation** | Domain + industry + tone + topic + brochure source → JSON | Subject line, HTML body, plain text |
-| **Proposal Generation** | Structured prompt with custom instructions → JSON | Full proposal document |
-| **Contact Selection** | AI analyzes contacts for campaign targeting | Filtered, scored contact lists |
-
-### SerpAPI (Live Google Search)
-
-| Feature | Implementation |
-|---|---|
-| **Rank Tracking** | Queries `serpapi.com/search.json` with `num=100` |
-| **Domain Matching** | Scans `organic_results[].link`, `displayed_link`, `source` |
-| **Rank History** | Stores `current_rank` and `previous_rank` with delta calculation |
-| **Bulk Sweep** | Updates all tracked keywords in a single operation |
 
 ---
 
 ## 🚢 Deployment
 
-### Production Build
+### Build for Production
 
 ```bash
-# Backend: Build fat JAR
+# Backend → fat JAR
 cd agentic-ai-platform
 ./mvnw clean package -DskipTests
-# Output: target/agentic-ai-platform-0.1.0-SNAPSHOT.jar
+# → target/agentic-ai-platform-0.1.0-SNAPSHOT.jar
 
-# Frontend: Build static assets
+# Frontend → static files
 cd ../ai-agentic-frontend
 npm run build
-# Output: dist/
+# → dist/
 ```
 
-### Run Production Backend
+### Run Production
 
 ```bash
-java -jar target/agentic-ai-platform-0.1.0-SNAPSHOT.jar
+java -jar agentic-ai-platform/target/agentic-ai-platform-0.1.0-SNAPSHOT.jar
 ```
 
-### Frontend Deployment
+### Frontend Hosting
 
-The frontend builds to static files in `dist/` and can be deployed to:
-- **Netlify** (includes `_redirects` for SPA routing)
-- **Vercel**
-- **Nginx** / **Apache** (configure SPA fallback)
-- **AWS S3 + CloudFront**
+The `dist/` folder includes `_redirects` for SPA routing. Deploy to:
 
-### Docker (Optional)
+| Platform | Notes |
+|:---|:---|
+| **Netlify** | Drop `dist/` folder, `_redirects` handles SPA routing |
+| **Vercel** | `vercel.json` included with rewrite rules |
+| **Nginx** | Add `try_files $uri /index.html` |
+| **AWS S3 + CloudFront** | Enable SPA error page redirect to `index.html` |
+
+### Docker Example
 
 ```dockerfile
-# Backend Dockerfile example
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY target/agentic-ai-platform-0.1.0-SNAPSHOT.jar app.jar
@@ -594,31 +592,27 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ## 🤝 Contributing
 
-1. **Fork** this repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit changes: `git commit -m "Add my feature"`
+4. Push: `git push origin feature/my-feature`
+5. Open a Pull Request
 
-### Code Standards
-
-- **Backend:** Follow Spring Boot conventions, service-interface pattern, DTO separation
-- **Frontend:** Functional components, Redux Toolkit slices, Lucide icons
-- **Database:** Flyway migrations only — never modify schema manually
-- **API:** RESTful conventions, proper HTTP status codes, JSON responses
+**Guidelines:**
+- Backend → Spring Boot conventions, service-interface pattern, DTOs for all requests/responses
+- Frontend → Functional components, Redux Toolkit slices, Lucide icons
+- Database → Flyway migrations only, never alter schema manually
+- API → RESTful, proper HTTP status codes, JSON responses
 
 ---
 
 ## 📄 License
 
-This project is proprietary software. All rights reserved.
+Proprietary — All rights reserved.
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ by <a href="https://github.com/Abhio2i">Abhio2i</a></strong>
-  <br/>
-  <sub>Enterprise Agentic AI Platform — Powering the future of autonomous business operations</sub>
+  Built by <a href="https://github.com/Abhio2i"><strong>Abhio2i</strong></a><br/>
+  <sub>Enterprise Agentic AI — Autonomous Business Operations Platform</sub>
 </p>
-#   A g e n t i c - A i - n e w  
- 
