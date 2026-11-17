@@ -455,14 +455,28 @@ export const ContentStudioPage = () => {
         details: `Dispatched campaign "${campaignName}" to ${matchedContacts.length} contacts (${targetDesc}).`,
       }));
 
-      // Poll campaign status once
-      if (result.campaignId) {
+      // Poll campaign status actively while SENDING
+      if (result.campaignId && result.status === 'SENDING') {
+        const intervalId = setInterval(async () => {
+          try {
+            const status = await getCampaignStatus(result.campaignId);
+            setTrackingStatus(status);
+            if (status.status !== 'SENDING') {
+              clearInterval(intervalId);
+              fetchCampaignsList();
+              showFeedback(`Campaign completed! ${status.sentCount || 0} / ${status.totalRecipients || 0} emails delivered safely with GoDaddy rate pacing.`, 'success');
+            }
+          } catch {
+            clearInterval(intervalId);
+          }
+        }, 2000);
+      } else if (result.campaignId) {
         setTimeout(async () => {
           try {
             const status = await getCampaignStatus(result.campaignId);
             setTrackingStatus(status);
           } catch {}
-        }, 1500);
+        }, 1000);
       }
     } catch (err) {
       showFeedback(`Campaign dispatch failed: ${err.message}`, 'error');
@@ -1168,6 +1182,11 @@ export const ContentStudioPage = () => {
                   {activeCampaignResult.sent !== undefined && (
                     <div>Sent: <strong>{activeCampaignResult.sent}</strong> · Failed: <strong>{activeCampaignResult.failed || 0}</strong></div>
                   )}
+                  {activeCampaignResult.rateLimitPolicy && (
+                    <div style={{ marginTop: 4, color: '#0284c7', fontSize: 11.5, fontWeight: 600 }}>
+                      🛡️ {activeCampaignResult.rateLimitPolicy}
+                    </div>
+                  )}
                   {activeCampaignResult.note && (
                     <div style={{ marginTop: 4, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                       ℹ {activeCampaignResult.note}
@@ -1179,15 +1198,51 @@ export const ContentStudioPage = () => {
                     </div>
                   )}
                   {trackingStatus && (
-                    <div style={{ marginTop: 4, color: 'var(--text-primary)' }}>
-                      Status: <strong>{trackingStatus.status}</strong> ·
-                      Delivered: {trackingStatus.deliveredCount ?? trackingStatus.delivered ?? 0} ·
-                      Opened: {trackingStatus.openedCount ?? trackingStatus.opened ?? 0} ·
-                      Bounced: {trackingStatus.bouncedCount ?? trackingStatus.bounced ?? 0}
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 12 }}>
+                        <span>
+                          Status: <strong style={{ color: trackingStatus.status === 'COMPLETED' ? '#16a34a' : (trackingStatus.status === 'SENDING' ? '#2563eb' : '#dc2626') }}>{trackingStatus.status}</strong>
+                          {trackingStatus.status === 'SENDING' && (
+                            <span style={{ marginLeft: 8, fontSize: 11, color: '#0284c7' }}>
+                              {(trackingStatus.sentCount > 0 && trackingStatus.sentCount % 25 === 0 && trackingStatus.sentCount < (trackingStatus.totalRecipients || 1))
+                                ? '⏸ Cooldown active (60s wait for GoDaddy rate limit)'
+                                : '🚀 Sending batch (25/min safe mode)...'}
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                          {trackingStatus.sentCount ?? 0} / {trackingStatus.totalRecipients ?? activeCampaignResult.totalQueued ?? 1} Sent
+                        </span>
+                      </div>
+                      <div style={{ height: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min(100, Math.round(((trackingStatus.sentCount ?? 0) / (trackingStatus.totalRecipients || 1)) * 100))}%`,
+                          background: trackingStatus.status === 'COMPLETED' ? '#22c55e' : '#2563eb',
+                          transition: 'width 0.4s ease'
+                        }} />
+                      </div>
                     </div>
                   )}
                 </div>
               )}
+
+              {/* GoDaddy Rate Pacing Info Pill */}
+              <div style={{
+                fontSize: 11.5,
+                color: '#0369a1',
+                background: 'rgba(14, 165, 233, 0.08)',
+                border: '1px solid rgba(14, 165, 233, 0.25)',
+                padding: '6px 12px',
+                borderRadius: 6,
+                marginTop: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <span>🛡️</span>
+                <span><strong>GoDaddy Rate Limit Protection:</strong> Pacing at <strong>25 emails/minute</strong> with 60s cooldown between batches to prevent mailbox bans.</span>
+              </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>

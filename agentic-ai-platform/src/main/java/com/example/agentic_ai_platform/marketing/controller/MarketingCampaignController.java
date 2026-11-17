@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +46,9 @@ public class MarketingCampaignController {
     private final String fromAddress;
     private final String mailHost;
     private final String allowedSendersConfig;
+    private final int batchSize;
+    private final int pauseSeconds;
+    private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     private final Map<UUID, CampaignState> campaigns = new ConcurrentHashMap<>();
 
@@ -79,12 +84,16 @@ public class MarketingCampaignController {
             MarketingCustomerListService customerLists,
             @Value("${spring.mail.from:verified-sender@example.com}") String fromAddress,
             @Value("${spring.mail.host:}") String mailHost,
-            @Value("${app.marketing.allowed-senders:}") String allowedSendersConfig) {
+            @Value("${app.marketing.allowed-senders:}") String allowedSendersConfig,
+            @Value("${app.marketing.mail.rate-limit.batch-size:25}") int batchSize,
+            @Value("${app.marketing.mail.rate-limit.pause-seconds:60}") int pauseSeconds) {
         this.mailSender = mailSender;
         this.customerLists = customerLists;
         this.fromAddress = fromAddress;
         this.mailHost = mailHost;
         this.allowedSendersConfig = allowedSendersConfig;
+        this.batchSize = batchSize > 0 ? batchSize : 25;
+        this.pauseSeconds = pauseSeconds >= 0 ? pauseSeconds : 60;
     }
 
     @GetMapping
@@ -113,7 +122,10 @@ public class MarketingCampaignController {
         return Map.of(
                 "smtpConfigured", mailHost != null && !mailHost.isBlank(),
                 "defaultSender", fromAddress != null ? fromAddress.trim() : "verified-sender@example.com",
-                "allowedSenders", allowed
+                "allowedSenders", allowed,
+                "batchSize", batchSize,
+                "pauseSeconds", pauseSeconds,
+                "rateLimitNotice", batchSize + " emails per minute with " + pauseSeconds + "s cooldown (GoDaddy Safe Mode)"
         );
     }
 
@@ -164,11 +176,35 @@ public class MarketingCampaignController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No contacts found for the selected audience");
         }
 
-        int sent = 0;
         int total = recipients.size();
-        String lastError = null;
+        Instant now = Instant.now();
 
-        for (MarketingContactResponse contact : recipients) {
+        // Safely extract attachment bytes synchronously before entering background worker
+        final byte[] attachBytes;
+        final String attachName;
+        final String attachContentType;
+        if (attachment != null && !attachment.isEmpty()) {
+            if (attachment.getSize() > 10L * 1024 * 1024) {
+                throw new IllegalArgumentException("Attachment exceeds 10 MiB");
+            }
+            try {
+                attachBytes = attachment.getBytes();
+                attachName = attachment.getOriginalFilename() == null ? "attachment" : attachment.getOriginalFilename().replaceAll("[\\\\/]", "_");
+                attachContentType = attachment.getContentType() == null ? "application/octet-stream" : attachment.getContentType();
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read attachment file: " + e.getMessage());
+            }
+        } else {
+            attachBytes = null;
+            attachName = null;
+            attachContentType = null;
+        }
+
+        // Fast path: Single direct recipient (e.g. test email or proposal transmission)
+        if (total == 1) {
+            MarketingContactResponse contact = recipients.getFirst();
+            int sent = 0;
+            String lastError = null;
             try {
                 String html = personalizeHtml(request.contentHtml(), contact, request.senderName());
                 String personalizedSubject = personalizeSubject(request.subject() == null ? "" : request.subject(), contact, request.senderName());
@@ -183,71 +219,147 @@ public class MarketingCampaignController {
                 helper.setSubject(personalizedSubject);
                 helper.setText(html, true);
                 if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
-                if (attachment != null && !attachment.isEmpty()) {
-                    if (attachment.getSize() > 10L * 1024 * 1024) throw new IllegalArgumentException("Attachment exceeds 10 MiB");
-                    String filename = attachment.getOriginalFilename() == null ? "attachment" : attachment.getOriginalFilename().replaceAll("[\\\\/]", "_");
-                    helper.addAttachment(filename, new ByteArrayResource(attachment.getBytes()),
-                            attachment.getContentType() == null ? "application/octet-stream" : attachment.getContentType());
+                if (attachBytes != null) {
+                    helper.addAttachment(attachName, new ByteArrayResource(attachBytes), attachContentType);
                 }
 
                 if (mailHost != null && !mailHost.isBlank()) {
                     mailSender.send(message);
-                    log.info("Dispatched email via SMTP to {}", contact.email());
+                    log.info("Dispatched single email via SMTP to {}", contact.email());
                 } else {
-                    log.info("SMTP_HOST not set: simulated dispatch to {}", contact.email());
+                    log.info("SMTP_HOST not set: simulated single dispatch to {}", contact.email());
                 }
-                sent++;
+                sent = 1;
             } catch (Exception ex) {
                 lastError = ex.getMessage();
-                log.error("Failed to send email to {}: {}", contact.email(), ex.getMessage());
+                log.error("Failed to send single email to {}: {}", contact.email(), ex.getMessage());
             }
+
+            String status = (sent == 1) ? "COMPLETED" : "FAILED";
+            CampaignState state = new CampaignState(
+                    campaignId, tenant,
+                    request.campaignName() != null ? request.campaignName() : "Target Outreach",
+                    campaignTarget,
+                    request.subject() != null ? request.subject() : "Executive Communication",
+                    status, 1, sent, sent, 0, 0, (sent == 1 ? 0 : 1), now, Instant.now()
+            );
+            campaigns.put(campaignId, state);
+
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("campaignId", campaignId.toString());
+            responseMap.put("campaignName", state.campaignName());
+            responseMap.put("targetDomain", state.targetDomain());
+            responseMap.put("status", status);
+            responseMap.put("totalQueued", 1);
+            responseMap.put("recipientCount", 1);
+            responseMap.put("sent", sent);
+            responseMap.put("failed", (sent == 1 ? 0 : 1));
+            responseMap.put("dispatchedAt", now.toString());
+            if (lastError != null) responseMap.put("errorDetail", lastError);
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(responseMap);
         }
 
-        int bounced = total - sent;
-        Instant now = Instant.now();
-        String status;
-        if (sent == total && total > 0) {
-            status = "COMPLETED";
-        } else if (sent > 0) {
-            status = "PARTIAL";
-        } else {
-            status = "FAILED";
-        }
-
-        CampaignState state = new CampaignState(
-                campaignId,
-                tenant,
+        // Bulk Path: Asynchronous execution with GoDaddy rate-limiting (25 emails/batch + 60s cooldown)
+        CampaignState initialState = new CampaignState(
+                campaignId, tenant,
                 request.campaignName() != null ? request.campaignName() : "Target Outreach",
                 campaignTarget,
                 request.subject() != null ? request.subject() : "Executive Communication",
-                status,
-                total,
-                sent,
-                sent,
-                0,
-                0,
-                bounced,
-                now,
-                Instant.now()
+                "SENDING", total, 0, 0, 0, 0, 0, now, null
         );
-        campaigns.put(campaignId, state);
+        campaigns.put(campaignId, initialState);
+
+        executorService.submit(() -> {
+            int sent = 0;
+            int failed = 0;
+            int batchCount = 0;
+            for (int i = 0; i < recipients.size(); i++) {
+                MarketingContactResponse contact = recipients.get(i);
+                try {
+                    String html = personalizeHtml(request.contentHtml(), contact, request.senderName());
+                    String personalizedSubject = personalizeSubject(request.subject() == null ? "" : request.subject(), contact, request.senderName());
+                    var message = mailSender.createMimeMessage();
+                    var helper = new MimeMessageHelper(message, "UTF-8");
+                    if (request.senderName() != null && !request.senderName().isBlank()) {
+                        helper.setFrom(effectiveFrom, request.senderName());
+                    } else {
+                        helper.setFrom(effectiveFrom);
+                    }
+                    helper.setTo(contact.email());
+                    helper.setSubject(personalizedSubject);
+                    helper.setText(html, true);
+                    if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
+                    if (attachBytes != null) {
+                        helper.addAttachment(attachName, new ByteArrayResource(attachBytes), attachContentType);
+                    }
+
+                    if (mailHost != null && !mailHost.isBlank()) {
+                        mailSender.send(message);
+                        log.info("Dispatched email ({}/{}) via SMTP to {}", i + 1, total, contact.email());
+                    } else {
+                        log.info("SMTP_HOST not set: simulated dispatch ({}/{}) to {}", i + 1, total, contact.email());
+                    }
+                    sent++;
+                } catch (Exception ex) {
+                    failed++;
+                    log.error("Failed to send email to {}: {}", contact.email(), ex.getMessage());
+                }
+
+                batchCount++;
+
+                // Real-time progress update
+                CampaignState progressState = new CampaignState(
+                        campaignId, tenant,
+                        request.campaignName() != null ? request.campaignName() : "Target Outreach",
+                        campaignTarget,
+                        request.subject() != null ? request.subject() : "Executive Communication",
+                        "SENDING", total, sent, sent, 0, 0, failed, now, null
+                );
+                campaigns.put(campaignId, progressState);
+
+                // Rate limiting pause: every 25 emails, pause 60 seconds unless this was the last recipient
+                if (batchCount >= batchSize && (i + 1) < recipients.size()) {
+                    log.info("GoDaddy rate pacing triggered: {} emails sent in current minute. Cooling down for {} seconds before next batch...",
+                            batchCount, pauseSeconds);
+                    try {
+                        Thread.sleep(pauseSeconds * 1000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("Campaign {} email dispatch interrupted during cooldown", campaignId);
+                        break;
+                    }
+                    batchCount = 0; // reset for next batch
+                }
+            }
+
+            String finalStatus = (sent == total && total > 0) ? "COMPLETED" : (sent > 0 ? "PARTIAL" : "FAILED");
+            CampaignState finalState = new CampaignState(
+                    campaignId, tenant,
+                    request.campaignName() != null ? request.campaignName() : "Target Outreach",
+                    campaignTarget,
+                    request.subject() != null ? request.subject() : "Executive Communication",
+                    finalStatus, total, sent, sent, 0, 0, failed, now, Instant.now()
+            );
+            campaigns.put(campaignId, finalState);
+            log.info("Campaign {} finished dispatching. Status: {}, Total: {}, Sent: {}, Failed: {}",
+                    campaignId, finalStatus, total, sent, failed);
+        });
 
         Map<String, Object> responseMap = new HashMap<>();
         responseMap.put("campaignId", campaignId.toString());
-        responseMap.put("campaignName", state.campaignName());
-        responseMap.put("targetDomain", state.targetDomain());
-        responseMap.put("status", state.status());
+        responseMap.put("campaignName", initialState.campaignName());
+        responseMap.put("targetDomain", initialState.targetDomain());
+        responseMap.put("status", "SENDING");
         responseMap.put("totalQueued", total);
         responseMap.put("recipientCount", total);
-        responseMap.put("sent", sent);
-        responseMap.put("failed", bounced);
+        responseMap.put("sent", 0);
+        responseMap.put("batchSize", batchSize);
+        responseMap.put("pauseSeconds", pauseSeconds);
+        responseMap.put("rateLimitPolicy", "GoDaddy Safe Mode: " + batchSize + " emails/min with " + pauseSeconds + "s pause between batches");
         responseMap.put("dispatchedAt", now.toString());
-        if (lastError != null) {
-            responseMap.put("errorDetail", lastError);
-        } else if (mailHost == null || mailHost.isBlank()) {
-            responseMap.put("note", "SMTP_HOST not set on server; delivery simulated successfully.");
+        if (mailHost == null || mailHost.isBlank()) {
+            responseMap.put("note", "SMTP_HOST not set on server; delivery simulated with rate limiting.");
         }
-
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(responseMap);
     }
 
