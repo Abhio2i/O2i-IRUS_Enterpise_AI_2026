@@ -323,6 +323,21 @@ export const ContentStudioPage = () => {
       localStorage.removeItem('selectedCampaignListName');
     }
 
+    const preselectedDirectContactRaw = localStorage.getItem('selectedDirectContact');
+    if (preselectedDirectContactRaw) {
+      try {
+        const contact = JSON.parse(preselectedDirectContactRaw);
+        setActiveTab('Sender');
+        setAudienceType('DIRECT');
+        setDirectEmail(contact.email || '');
+        setDirectFirstName(contact.firstName || '');
+        setDirectLastName(contact.lastName || '');
+        setDirectCompany(contact.company || 'Oxygen to Innovation');
+        setCampaignName(`Direct Outreach - ${contact.company || contact.email}`);
+      } catch {}
+      localStorage.removeItem('selectedDirectContact');
+    }
+
     const proposalCampaignRaw = localStorage.getItem('selectedProposalCampaign') || localStorage.getItem('activeSelectedProposal');
     if (proposalCampaignRaw) {
       try {

@@ -372,6 +372,18 @@ export const CustomerListsPage = () => {
     }
   };
 
+  // ── Compose Email to Single Contact ──────────────────────────────────────
+  const handleSendEmailToContact = (contact) => {
+    if (!contact?.email) return;
+    localStorage.setItem('selectedDirectContact', JSON.stringify({
+      email: contact.email,
+      firstName: contact.firstName || '',
+      lastName: contact.lastName || '',
+      company: contact.company || '',
+    }));
+    dispatch(setActiveRoute('marketing.studio'));
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
@@ -785,6 +797,14 @@ export const CustomerListsPage = () => {
                         <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                           <button
                             className="btn btn-ghost btn-xs"
+                            style={{ color: '#2563eb', padding: '3px 6px' }}
+                            title="Compose email to this contact"
+                            onClick={() => handleSendEmailToContact(c)}
+                          >
+                            <Mail size={12} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-xs"
                             style={{ padding: '3px 6px', color: '#6366f1' }}
                             title="View all entity details"
                             onClick={() => setSelectedContactModal(c)}
@@ -896,6 +916,17 @@ export const CustomerListsPage = () => {
                 }}
               >
                 <Trash2 size={13} /> Delete Contact
+              </button>
+              <button
+                className="btn btn-solid btn-sm"
+                style={{ background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }}
+                onClick={() => {
+                  const target = selectedContactModal;
+                  setSelectedContactModal(null);
+                  handleSendEmailToContact(target);
+                }}
+              >
+                <Mail size={13} /> Compose Email
               </button>
             </div>
           </div>
