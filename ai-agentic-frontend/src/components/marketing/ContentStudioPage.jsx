@@ -4,7 +4,8 @@ import { createCampaign } from '../../store/marketingSlice';
 import { addAuditLog } from '../../store/governanceSlice';
 import {
   Mail, CheckCircle, ShieldCheck, Send, Eye,
-  Globe, RefreshCw, AlertCircle, FileText, Trash2, ArrowRight, Sparkles, Server, Users, Zap
+  Globe, RefreshCw, AlertCircle, FileText, Trash2, ArrowRight, Sparkles, Server, Users, Zap,
+  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser
 } from 'lucide-react';
 import {
   getContactsByDomain,
@@ -51,23 +52,84 @@ export const ContentStudioPage = () => {
 
   const emailSubjectRef = useRef(null);
   const emailBodyRef = useRef(null);
+  const visualEditorRef = useRef(null);
+  const [editorMode, setEditorMode] = useState('visual'); // 'visual' | 'code'
 
-  const insertTokenBody = (token) => {
-    const el = emailBodyRef.current;
-    if (el) {
-      const start = el.selectionStart || 0;
-      const end = el.selectionEnd || 0;
-      const val = emailBodyHtml;
-      const next = val.substring(0, start) + token + val.substring(end);
-      setEmailBodyHtml(next);
-      setTimeout(() => {
-        el.focus();
-        el.setSelectionRange(start + token.length, start + token.length);
-      }, 0);
-    } else {
-      setEmailBodyHtml(prev => prev + token);
+  const ensureHtml = (content) => {
+    if (!content) return '';
+    const trimmed = content.trim();
+    if (/<[a-z][\s\S]*>/i.test(trimmed)) {
+      return trimmed;
+    }
+    return trimmed
+      .split(/\n\s*\n/)
+      .map(p => `<p>${p.trim().replace(/\n/g, '<br/>')}</p>`)
+      .join('\n');
+  };
+
+  const handleVisualInput = () => {
+    if (visualEditorRef.current) {
+      setEmailBodyHtml(visualEditorRef.current.innerHTML);
     }
   };
+
+  const execFormat = (command, value = null) => {
+    if (visualEditorRef.current) {
+      visualEditorRef.current.focus();
+      document.execCommand(command, false, value);
+      setEmailBodyHtml(visualEditorRef.current.innerHTML);
+    }
+  };
+
+  const handleInsertLink = () => {
+    const url = window.prompt('Enter link URL (e.g. https://o2i.tech):', 'https://');
+    if (url && url.trim()) {
+      execFormat('createLink', url.trim());
+    }
+  };
+
+  const insertTokenBody = (token) => {
+    if (editorMode === 'visual' && visualEditorRef.current) {
+      visualEditorRef.current.focus();
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        document.execCommand('insertText', false, token);
+      } else {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(token);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      setEmailBodyHtml(visualEditorRef.current.innerHTML);
+    } else {
+      const el = emailBodyRef.current;
+      if (el) {
+        const start = el.selectionStart || 0;
+        const end = el.selectionEnd || 0;
+        const val = emailBodyHtml;
+        const next = val.substring(0, start) + token + val.substring(end);
+        setEmailBodyHtml(next);
+        setTimeout(() => {
+          el.focus();
+          el.setSelectionRange(start + token.length, start + token.length);
+        }, 0);
+      } else {
+        setEmailBodyHtml(prev => prev + token);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (editorMode === 'visual' && visualEditorRef.current) {
+      if (visualEditorRef.current.innerHTML !== emailBodyHtml) {
+        visualEditorRef.current.innerHTML = emailBodyHtml || '';
+      }
+    }
+  }, [emailBodyHtml, editorMode]);
 
   const insertTokenSubject = (token) => {
     const el = emailSubjectRef.current;
@@ -421,7 +483,7 @@ export const ContentStudioPage = () => {
         directLastName: audienceType === 'DIRECT' ? directLastName.trim() : undefined,
         directCompany: audienceType === 'DIRECT' ? directCompany.trim() : undefined,
         subject: emailSubject,
-        contentHtml: emailBodyHtml,
+        contentHtml: ensureHtml(emailBodyHtml),
         fromEmail: effectiveFrom,
         senderName,
         replyTo,
@@ -507,7 +569,7 @@ export const ContentStudioPage = () => {
       const created = await createEmailTemplate({
         name: newTemplateName.trim(),
         subject: emailSubject,
-        contentHtml: emailBodyHtml,
+        contentHtml: ensureHtml(emailBodyHtml),
         industry: aiIndustry,
         tone: aiTone,
       });
@@ -1061,10 +1123,15 @@ export const ContentStudioPage = () => {
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>Email Content (HTML & Tokens)</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <label className="form-label" style={{ marginBottom: 0, fontWeight: 700 }}>Email Body Composer</label>
+                    <span style={{ fontSize: 11, color: editorMode === 'visual' ? '#16a34a' : 'var(--text-muted)', background: editorMode === 'visual' ? 'rgba(34,197,94,0.1)' : 'var(--bg-hover)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                      {editorMode === 'visual' ? '✓ No HTML Tags Needed' : 'Raw HTML Mode'}
+                    </span>
+                  </div>
                   <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Click to Insert Token:</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Insert Variable:</span>
                     {[
                       { token: '{{firstName}}', color: '#4f46e5', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.25)' },
                       { token: '{{lastName}}', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)', border: 'rgba(2, 132, 199, 0.25)' },
@@ -1094,15 +1161,187 @@ export const ContentStudioPage = () => {
                     ))}
                   </div>
                 </div>
-                <textarea
-                  ref={emailBodyRef}
-                  className="input mono"
-                  rows={10}
-                  value={emailBodyHtml}
-                  onChange={e => setEmailBodyHtml(e.target.value)}
-                  style={{ fontSize: 12 }}
-                  required
-                />
+
+                {/* Toolbar */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '7px 10px',
+                  background: 'var(--bg-hover)',
+                  border: '1px solid var(--border-default)',
+                  borderRadius: '8px 8px 0 0',
+                  borderBottom: 'none',
+                  flexWrap: 'wrap',
+                  gap: 6
+                }}>
+                  {editorMode === 'visual' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={() => execFormat('bold')}
+                        title="Bold (Ctrl+B)"
+                      >
+                        <Bold size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={() => execFormat('italic')}
+                        title="Italic (Ctrl+I)"
+                      >
+                        <Italic size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={() => execFormat('underline')}
+                        title="Underline (Ctrl+U)"
+                      >
+                        <Underline size={13} />
+                      </button>
+                      <div style={{ width: 1, height: 16, background: 'var(--border-default)', margin: '0 4px' }} />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={() => execFormat('insertUnorderedList')}
+                        title="Bullet List"
+                      >
+                        <List size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={() => execFormat('insertOrderedList')}
+                        title="Numbered List"
+                      >
+                        <ListOrdered size={13} />
+                      </button>
+                      <div style={{ width: 1, height: 16, background: 'var(--border-default)', margin: '0 4px' }} />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={handleInsertLink}
+                        title="Insert Web Link"
+                      >
+                        <Link2 size={13} /> Link
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ minWidth: 26, padding: '3px 7px' }}
+                        onClick={() => execFormat('removeFormat')}
+                        title="Clear Formatting"
+                      >
+                        <Eraser size={13} /> Clear
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      Advanced HTML Source Editor
+                    </div>
+                  )}
+
+                  {/* Mode switcher tabs */}
+                  <div style={{
+                    display: 'inline-flex',
+                    borderRadius: 6,
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-default)',
+                    padding: 2
+                  }}>
+                    <button
+                      type="button"
+                      style={{
+                        border: 'none',
+                        borderRadius: 4,
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: editorMode === 'visual' ? 'var(--brand-primary, #2563eb)' : 'transparent',
+                        color: editorMode === 'visual' ? '#fff' : 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                      onClick={() => setEditorMode('visual')}
+                      title="User-Friendly Visual Editor (Normal text without HTML tags)"
+                    >
+                      <Type size={11} /> Visual (Friendly)
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        border: 'none',
+                        borderRadius: 4,
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: editorMode === 'code' ? 'var(--brand-primary, #2563eb)' : 'transparent',
+                        color: editorMode === 'code' ? '#fff' : 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                      onClick={() => setEditorMode('code')}
+                      title="Raw HTML Code Mode"
+                    >
+                      <Code size={11} /> HTML Code
+                    </button>
+                  </div>
+                </div>
+
+                {/* Editor Content Body */}
+                {editorMode === 'visual' ? (
+                  <div
+                    ref={visualEditorRef}
+                    contentEditable
+                    onInput={handleVisualInput}
+                    onBlur={handleVisualInput}
+                    style={{
+                      minHeight: 240,
+                      maxHeight: 480,
+                      overflowY: 'auto',
+                      padding: '14px 16px',
+                      borderRadius: '0 0 8px 8px',
+                      border: '1px solid var(--border-default)',
+                      background: 'var(--bg-input, var(--bg-elevated))',
+                      color: 'var(--text-primary)',
+                      fontSize: 13,
+                      lineHeight: 1.65,
+                      outline: 'none',
+                    }}
+                    suppressContentEditableWarning
+                  />
+                ) : (
+                  <textarea
+                    ref={emailBodyRef}
+                    className="input mono"
+                    rows={11}
+                    value={emailBodyHtml}
+                    onChange={e => setEmailBodyHtml(e.target.value)}
+                    style={{
+                      fontSize: 12,
+                      borderRadius: '0 0 8px 8px',
+                      borderTop: 'none'
+                    }}
+                    required
+                  />
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {editorMode === 'visual'
+                    ? '💡 Tip: Type normally or paste text. Use Bold, Italic, Bullet lists, or Insert Variables above — no HTML tags needed!'
+                    : '💡 In HTML Code mode, you can directly inspect and edit raw tags like <p>, <strong>, and <a>.'}
+                </div>
               </div>
 
               <div>
