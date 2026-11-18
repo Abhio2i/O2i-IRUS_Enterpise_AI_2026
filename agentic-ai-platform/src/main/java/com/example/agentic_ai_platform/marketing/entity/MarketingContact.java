@@ -49,6 +49,45 @@ public class MarketingContact {
     @Column(name = "churn_probability", precision = 5, scale = 2)
     private BigDecimal churnProbability;
 
+    @Column(length = 160)
+    private String category;
+
+    @Column(length = 160)
+    private String type;
+
+    @Column(name = "parent_organization", length = 255)
+    private String parentOrganization;
+
+    @Column(name = "site_role", length = 160)
+    private String siteRole;
+
+    @Column(length = 80)
+    private String phone;
+
+    @Column(length = 255)
+    private String address;
+
+    @Column(length = 120)
+    private String city;
+
+    @Column(name = "postal_code", length = 40)
+    private String postalCode;
+
+    @Column(length = 120)
+    private String region;
+
+    @Column(length = 255)
+    private String website;
+
+    @Column(name = "contact_check", length = 120)
+    private String contactCheck;
+
+    @Column(length = 160)
+    private String source;
+
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -57,6 +96,17 @@ public class MarketingContact {
     public MarketingContact(UUID id, UUID tenantId, String email, String firstName, String lastName,
             String company, String title, String industry, String country, BigDecimal annualRevenue,
             String customerStatus, BigDecimal churnProbability) {
+        this(id, tenantId, email, firstName, lastName, company, title, industry, country,
+                annualRevenue, customerStatus, churnProbability,
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    public MarketingContact(UUID id, UUID tenantId, String email, String firstName, String lastName,
+            String company, String title, String industry, String country, BigDecimal annualRevenue,
+            String customerStatus, BigDecimal churnProbability, String category, String type,
+            String parentOrganization, String siteRole, String phone, String address, String city,
+            String postalCode, String region, String website, String contactCheck, String source,
+            String notes) {
         this.id = id;
         this.tenantId = tenantId;
         this.email = email;
@@ -69,6 +119,19 @@ public class MarketingContact {
         this.annualRevenue = annualRevenue;
         this.customerStatus = customerStatus;
         this.churnProbability = churnProbability;
+        this.category = category;
+        this.type = type;
+        this.parentOrganization = parentOrganization;
+        this.siteRole = siteRole;
+        this.phone = phone;
+        this.address = address;
+        this.city = city;
+        this.postalCode = postalCode;
+        this.region = region;
+        this.website = website;
+        this.contactCheck = contactCheck;
+        this.source = source;
+        this.notes = notes;
         this.createdAt = Instant.now();
     }
 
@@ -84,5 +147,18 @@ public class MarketingContact {
     public BigDecimal getAnnualRevenue() { return annualRevenue; }
     public String getCustomerStatus() { return customerStatus; }
     public BigDecimal getChurnProbability() { return churnProbability; }
+    public String getCategory() { return category; }
+    public String getType() { return type; }
+    public String getParentOrganization() { return parentOrganization; }
+    public String getSiteRole() { return siteRole; }
+    public String getPhone() { return phone; }
+    public String getAddress() { return address; }
+    public String getCity() { return city; }
+    public String getPostalCode() { return postalCode; }
+    public String getRegion() { return region; }
+    public String getWebsite() { return website; }
+    public String getContactCheck() { return contactCheck; }
+    public String getSource() { return source; }
+    public String getNotes() { return notes; }
     public Instant getCreatedAt() { return createdAt; }
 }

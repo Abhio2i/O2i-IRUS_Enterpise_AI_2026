@@ -10,7 +10,7 @@ import { setActiveRoute } from '../../store/navigationSlice';
 import {
   List, Users, Target, Zap, CheckCircle, Cpu, Plus,
   Trash2, RefreshCw, X, Check, AlertCircle, Upload, Sparkles,
-  Folder, FolderPlus
+  Folder, FolderPlus, Eye, ExternalLink, Phone, Mail, MapPin, Globe, Building2
 } from 'lucide-react';
 import {
   listCustomerLists,
@@ -89,6 +89,7 @@ export const CustomerListsPage = () => {
   const [importFolderName, setImportFolderName] = useState('');
   const [importTargetListId, setImportTargetListId] = useState('');
   const [deletingAll, setDeletingAll]   = useState(false);
+  const [selectedContactModal, setSelectedContactModal] = useState(null);
   const csvInputRef = useRef(null);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -687,28 +688,32 @@ export const CustomerListsPage = () => {
             <div style={{ padding: '40px 20px', textAlign: 'center' }}>
               <Upload size={30} color="var(--text-muted)" style={{ margin: '0 auto 10px' }} />
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>No Contacts Imported Yet</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 540, margin: '0 auto 16px', lineHeight: 1.5 }}>
-                Upload a CSV/TSV directory with at minimum an <code>Email</code> column. Smart columns supported:
-                <code>Organization / Site</code> (Company), <code>Category / Type</code> (Industry), <code>Region / City / Country</code>, <code>Name (First / Last)</code>, <code>Role / Title</code>, <code>Revenue</code>, <code>Status</code>, <code>Churn %</code>.
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 640, margin: '0 auto 16px', lineHeight: 1.6 }}>
+                Upload a CSV/TSV directory. Full directory entities supported:<br />
+                <code>Email</code> · <code>Organization / Site</code> · <code>Category</code> · <code>Type</code> · <code>Parent Organization</code> · <code>Site Role</code> · <code>Phone</code> · <code>Address</code> · <code>City</code> · <code>Postal Code</code> · <code>Region</code> · <code>Website</code> · <code>Contact Check</code> · <code>Source</code> · <code>Notes</code>.
               </div>
               <button className="btn btn-solid btn-sm" style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff' }} onClick={() => setIsImportOpen(true)}>
                 <Upload size={13} /> Import Contacts CSV
               </button>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="data-table">
+            <div className="table-wrap" style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ whiteSpace: 'nowrap' }}>
                 <thead>
                   <tr>
-                    <th>Name</th>
+                    <th>Organization / Site</th>
                     <th>Email</th>
-                    <th>Company</th>
-                    <th>Industry</th>
-                    <th>Country</th>
-                    <th>Revenue</th>
-                    <th>Status</th>
-                    <th className="mono" style={{ color: 'var(--text-muted)' }}>Churn %</th>
-                    <th style={{ textAlign: 'center', width: 50 }}>Action</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Parent Organization</th>
+                    <th>Site Role</th>
+                    <th>Phone</th>
+                    <th>City / Region</th>
+                    <th>Address & Postal</th>
+                    <th>Website</th>
+                    <th>Contact Check</th>
+                    <th>Source</th>
+                    <th style={{ textAlign: 'center', width: 70 }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -717,42 +722,84 @@ export const CustomerListsPage = () => {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 700, color: '#6366f1', flexShrink: 0 }}>
-                            {(c.firstName || c.email || '?')[0].toUpperCase()}
+                            {(c.company || c.firstName || c.email || '?')[0].toUpperCase()}
                           </div>
-                          <span style={{ fontWeight: 600, fontSize: 12.5 }}>
-                            {c.firstName || ''} {c.lastName || ''}
-                            {!c.firstName && !c.lastName ? (c.company || (c.email?.includes('@') ? c.email.split('@')[0] : '—')) : ''}
-                          </span>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: 12.5 }}>
+                              {c.company || `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email}
+                            </span>
+                            {c.parentOrganization && c.parentOrganization !== c.company && (
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                                Parent: {c.parentOrganization}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
-                      <td style={{ fontSize: 12, fontWeight: 500 }}>{c.company || '—'}</td>
-                      <td><span className="badge" style={{ fontSize: 10 }}>{c.industry || (c.title || 'General')}</span></td>
-                      <td style={{ fontSize: 12 }}>{c.country || (c.email?.endsWith('.ca') ? 'Canada' : '—')}</td>
-                      <td className="mono" style={{ fontSize: 12 }}>
-                        {c.annualRevenue != null ? `$${Number(c.annualRevenue).toLocaleString()}` : '—'}
+                      <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <a href={`mailto:${c.email}`} style={{ color: 'inherit', textDecoration: 'none' }}>{c.email || '—'}</a>
                       </td>
                       <td>
-                        {c.customerStatus ? (
-                          <span className={`badge ${c.customerStatus === 'ACTIVE' ? 'success' : c.customerStatus === 'CHURNED' ? 'danger' : 'warning'}`} style={{ fontSize: 10 }}>
-                            {c.customerStatus}
-                          </span>
-                        ) : (
-                          <span className="badge success" style={{ fontSize: 10 }}>ACTIVE</span>
-                        )}
+                        {c.category ? (
+                          <span className="badge" style={{ fontSize: 10, background: 'rgba(99,102,241,0.08)', color: '#6366f1' }}>{c.category}</span>
+                        ) : c.industry ? (
+                          <span className="badge" style={{ fontSize: 10 }}>{c.industry}</span>
+                        ) : '—'}
                       </td>
-                      <td className="mono" style={{ fontSize: 12, color: c.churnProbability > 70 ? '#dc2626' : c.churnProbability > 40 ? '#d97706' : 'var(--text-primary)' }}>
-                        {c.churnProbability != null ? `${c.churnProbability}%` : '—'}
+                      <td style={{ fontSize: 12 }}>
+                        {c.type ? <span className="badge" style={{ fontSize: 10 }}>{c.type}</span> : '—'}
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {c.parentOrganization || '—'}
+                      </td>
+                      <td style={{ fontSize: 12, fontWeight: 500 }}>
+                        {c.siteRole || c.title || '—'}
+                      </td>
+                      <td style={{ fontSize: 12, fontFamily: 'monospace' }}>
+                        {c.phone ? (
+                          <a href={`tel:${c.phone}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>{c.phone}</a>
+                        ) : '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {[c.city, c.region].filter(Boolean).join(', ') || c.country || '—'}
+                      </td>
+                      <td style={{ fontSize: 11.5, color: 'var(--text-secondary)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${c.address || ''} ${c.postalCode || ''}`}>
+                        {[c.address, c.postalCode].filter(Boolean).join(' ') || '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {c.website ? (
+                          <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" rel="noreferrer" style={{ color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            {c.website.replace(/^https?:\/\//, '').replace(/\/$/, '')} <ExternalLink size={10} />
+                          </a>
+                        ) : '—'}
+                      </td>
+                      <td>
+                        {c.contactCheck ? (
+                          <span className="badge success" style={{ fontSize: 10 }}>{c.contactCheck}</span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                        {c.source || 'CSV Import'}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          style={{ color: '#ef4444', padding: '4px 6px', opacity: 0.8 }}
-                          title="Delete contact"
-                          onClick={() => handleDeleteContact(c)}
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ padding: '3px 6px', color: '#6366f1' }}
+                            title="View all entity details"
+                            onClick={() => setSelectedContactModal(c)}
+                          >
+                            <Eye size={12} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ color: '#ef4444', padding: '3px 6px', opacity: 0.8 }}
+                            title="Delete contact"
+                            onClick={() => handleDeleteContact(c)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -760,6 +807,98 @@ export const CustomerListsPage = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: VIEW ALL CONTACT ENTITY DETAILS                             */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {selectedContactModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, backdropFilter: 'blur(4px)' }}
+          onClick={() => setSelectedContactModal(null)}
+        >
+          <div
+            style={{ background: 'var(--bg-elevated)', borderRadius: 14, border: '1px solid var(--border-default)', maxWidth: 600, width: '100%', padding: 24, boxShadow: '0 24px 48px rgba(0,0,0,0.22)', maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#6366f1' }}>
+                  {(selectedContactModal.company || selectedContactModal.firstName || selectedContactModal.email || '?')[0].toUpperCase()}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+                    {selectedContactModal.company || `${selectedContactModal.firstName || ''} ${selectedContactModal.lastName || ''}`.trim() || selectedContactModal.email}
+                  </h3>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {selectedContactModal.email}
+                  </div>
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setSelectedContactModal(null)}><X size={16} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              {[
+                ['Email', selectedContactModal.email],
+                ['Organization / Site', selectedContactModal.company],
+                ['Category', selectedContactModal.category || selectedContactModal.industry],
+                ['Type', selectedContactModal.type],
+                ['Parent Organization', selectedContactModal.parentOrganization],
+                ['Site Role', selectedContactModal.siteRole || selectedContactModal.title],
+                ['Phone', selectedContactModal.phone],
+                ['City', selectedContactModal.city],
+                ['Postal Code', selectedContactModal.postalCode],
+                ['Region', selectedContactModal.region],
+                ['Country', selectedContactModal.country],
+                ['Contact Check', selectedContactModal.contactCheck],
+                ['Source', selectedContactModal.source],
+                ['Website', selectedContactModal.website],
+                ['Revenue', selectedContactModal.annualRevenue != null ? `$${Number(selectedContactModal.annualRevenue).toLocaleString()}` : null],
+                ['Status', selectedContactModal.customerStatus || 'ACTIVE'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 7, border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>{k}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, wordBreak: 'break-word' }}>
+                    {v ? (
+                      k === 'Website' ? (
+                        <a href={v.startsWith('http') ? v : `https://${v}`} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>
+                          {v}
+                        </a>
+                      ) : (
+                        v
+                      )
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>—</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {selectedContactModal.notes && (
+              <div style={{ padding: '10px 12px', background: 'var(--bg-hover)', borderRadius: 7, border: '1px solid var(--border-subtle)', marginBottom: 16 }}>
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Notes</div>
+                <div style={{ fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{selectedContactModal.notes}</div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setSelectedContactModal(null)}>Close</button>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: '#ef4444' }}
+                onClick={() => {
+                  const toDel = selectedContactModal;
+                  setSelectedContactModal(null);
+                  handleDeleteContact(toDel);
+                }}
+              >
+                <Trash2 size={13} /> Delete Contact
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -945,8 +1084,8 @@ export const CustomerListsPage = () => {
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--bg-hover)', border: '1px solid var(--border-default)', marginBottom: 18, fontSize: 12, lineHeight: 1.6 }}>
-              <strong>Required column:</strong> <code>email</code><br />
-              <strong>Optional columns:</strong> firstName, lastName, company, title, industry, country, annualRevenue, customerStatus, churnProbability
+              <strong>Required column:</strong> <code>Email</code><br />
+              <strong>Supported directory columns:</strong> <code>Organization / Site</code>, <code>Category</code>, <code>Type</code>, <code>Parent Organization</code>, <code>Site Role</code>, <code>Phone</code>, <code>Address</code>, <code>City</code>, <code>Postal Code</code>, <code>Region</code>, <code>Website</code>, <code>Contact Check</code>, <code>Source</code>, <code>Notes</code>.
             </div>
 
             <form onSubmit={handleImport}>

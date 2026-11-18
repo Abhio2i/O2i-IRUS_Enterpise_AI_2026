@@ -45,9 +45,29 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
     private final int maxRows;
     private final int maxTotalContacts;
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
-    private static final Map<String, Integer> HEADER_LIMITS = Map.of(
-            "email", 320, "firstname", 120, "lastname", 120, "company", 200, "title", 160,
-            "industry", 120, "country", 120, "customerstatus", 80);
+    private static final Map<String, Integer> HEADER_LIMITS = Map.ofEntries(
+            Map.entry("email", 320),
+            Map.entry("firstname", 120),
+            Map.entry("lastname", 120),
+            Map.entry("company", 200),
+            Map.entry("title", 160),
+            Map.entry("industry", 120),
+            Map.entry("country", 120),
+            Map.entry("customerstatus", 80),
+            Map.entry("category", 160),
+            Map.entry("type", 160),
+            Map.entry("parentorganization", 255),
+            Map.entry("siterole", 160),
+            Map.entry("phone", 80),
+            Map.entry("address", 255),
+            Map.entry("city", 120),
+            Map.entry("postalcode", 40),
+            Map.entry("region", 120),
+            Map.entry("website", 255),
+            Map.entry("contactcheck", 120),
+            Map.entry("source", 160),
+            Map.entry("notes", 4000)
+    );
 
     public MarketingCustomerListServiceImpl(MarketingCustomerListRepository repository,
             MarketingContactRepository contacts, GroqContactSelector selector,
@@ -425,6 +445,38 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
         // 8. Churn Probability
         BigDecimal churn = decimal(firstNonBlank(record, indexes, "churnprobability", "churn", "churnpercent", "churnrate", "risk"), "churnProbability");
 
+        // 9. Exact Directory Entities / Fields
+        String category = firstNonBlank(record, indexes, "category", "orgcategory");
+        String type = firstNonBlank(record, indexes, "type", "sitetype", "organizationtype");
+        String parentOrg = firstNonBlank(record, indexes, "parentorganization", "parentorg", "parent");
+        String siteRole = firstNonBlank(record, indexes, "siterole", "role");
+        String phone = firstNonBlank(record, indexes, "phone", "phonenumber", "telephone", "tel", "mobile");
+        String address = firstNonBlank(record, indexes, "address", "street", "streetaddress", "location");
+        String city = firstNonBlank(record, indexes, "city", "town");
+        String postalCode = firstNonBlank(record, indexes, "postalcode", "postal", "zip", "zipcode", "postcode");
+        String region = firstNonBlank(record, indexes, "region", "province", "state");
+        String website = firstNonBlank(record, indexes, "website", "web", "url", "siteurl");
+        String contactCheck = firstNonBlank(record, indexes, "contactcheck", "check", "verification", "verified");
+        String source = firstNonBlank(record, indexes, "source", "leadsource", "datasource");
+        String notes = firstNonBlank(record, indexes, "notes", "note", "comments", "description");
+
+        // Cross-field fallbacks:
+        if (company.isBlank() && !parentOrg.isBlank()) {
+            company = parentOrg;
+        }
+        if (industry.isBlank()) {
+            if (!category.isBlank() && !type.isBlank()) {
+                industry = category + " · " + type;
+            } else if (!category.isBlank()) {
+                industry = category;
+            } else if (!type.isBlank()) {
+                industry = type;
+            }
+        }
+        if (title.isBlank() && !siteRole.isBlank()) {
+            title = siteRole;
+        }
+
         return new MarketingContact(
                 UUID.randomUUID(), tenantId, email,
                 optional(firstName, "firstName"),
@@ -435,7 +487,20 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
                 optional(country, "country"),
                 revenue,
                 optional(status, "customerStatus"),
-                churn
+                churn,
+                optional(category, "category"),
+                optional(type, "type"),
+                optional(parentOrg, "parentorganization"),
+                optional(siteRole, "siterole"),
+                optional(phone, "phone"),
+                optional(address, "address"),
+                optional(city, "city"),
+                optional(postalCode, "postalcode"),
+                optional(region, "region"),
+                optional(website, "website"),
+                optional(contactCheck, "contactcheck"),
+                optional(source, "source"),
+                optional(notes, "notes")
         );
     }
 

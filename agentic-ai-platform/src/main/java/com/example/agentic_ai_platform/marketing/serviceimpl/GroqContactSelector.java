@@ -77,6 +77,19 @@ public class GroqContactSelector {
                 if (contact.getChurnProbability() != null) {
                     candidate.put("churnProbability", contact.getChurnProbability());
                 }
+                putIfPresent(candidate, "category", contact.getCategory());
+                putIfPresent(candidate, "type", contact.getType());
+                putIfPresent(candidate, "parentOrganization", contact.getParentOrganization());
+                putIfPresent(candidate, "siteRole", contact.getSiteRole());
+                putIfPresent(candidate, "phone", contact.getPhone());
+                putIfPresent(candidate, "address", contact.getAddress());
+                putIfPresent(candidate, "city", contact.getCity());
+                putIfPresent(candidate, "postalCode", contact.getPostalCode());
+                putIfPresent(candidate, "region", contact.getRegion());
+                putIfPresent(candidate, "website", contact.getWebsite());
+                putIfPresent(candidate, "contactCheck", contact.getContactCheck());
+                putIfPresent(candidate, "source", contact.getSource());
+                putIfPresent(candidate, "notes", contact.getNotes());
             }
             // OpenAI/Groq API requires content to be a string
             messages.addObject().put("role", "user").put("content", objectMapper.writeValueAsString(userContent));
