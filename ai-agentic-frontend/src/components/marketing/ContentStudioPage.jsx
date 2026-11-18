@@ -50,6 +50,60 @@ export const ContentStudioPage = () => {
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [loadingAssets, setLoadingAssets] = useState(false);
 
+  // AI Generation inputs
+  const [aiIndustry, setAiIndustry] = useState('Automotive');
+  const [aiTone, setAiTone] = useState('EXECUTIVE');
+  const [aiTopic, setAiTopic] = useState('ERP Modernisation & AI Supply Chain Integration');
+  const [aiCta, setAiCta] = useState('Schedule a 15-min Architecture Review');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Email Composer state
+  const [campaignName, setCampaignName] = useState('Oxygen to Innovation - Executive Outreach');
+  const [emailSubject, setEmailSubject] = useState('A practical path to faster exception settlement | Oxygen to Innovation');
+  const [emailBodyHtml, setEmailBodyHtml] = useState(
+`<p>Hi {{firstName}},</p>
+<p>Organizations across the industry are under growing pressure to accelerate throughput, strengthen operational resilience, and maintain real-time visibility across complex business workflows.</p>
+
+<p>At <strong>Oxygen to Innovation</strong>, our Enterprise AI Platform connects your operational workflows directly with intelligent document intake, automated compliance checks, and enterprise-grade exception routing. By verifying incoming files against corporate business rules in real time, teams eliminate repetitive manual data re-entry while maintaining strict audit governance.</p>
+
+<p>For {{company}}, a practical modernization engagement focuses on four high-impact areas:</p>
+<ul>
+  <li><strong>ERP & Core Touchpoints:</strong> Bi-directional synchronization minimizing manual transcription latency.</li>
+  <li><strong>Autonomous Exception Routing:</strong> Intelligent exception queues with customizable approval controls and audit trails.</li>
+  <li><strong>Predictive Analytics:</strong> Real-time tracking of operational cycle times, exception frequency, and SLA performance.</li>
+  <li><strong>Enterprise Security:</strong> Role-based access control, SOC2/ISO compliance, and complete data residency.</li>
+</ul>
+
+<p>We have prepared a targeted solution brief and reference architecture outlining a focused, phased rollout for engineering and operational leadership.</p>
+
+<p><a href="https://o2i.tech"><strong>Schedule a 15-Minute Architecture Review</strong></a>, or reply with a convenient time that suits your calendar this week.</p>
+
+<p>Best regards,<br/><strong>{{senderName}}</strong><br/>Oxygen to Innovation</p>
+<p><small style="color: #6b7280;">If this topic is outside your current mandate, reply with your preferences and we will update our records immediately.</small></p>`
+  );
+  const [fromEmail, setFromEmail] = useState('');
+  const [defaultSender, setDefaultSender] = useState('');
+  const [allowedSenders, setAllowedSenders] = useState([]);
+  const [senderName, setSenderName] = useState('Oxygen to Innovation');
+  const [replyTo, setReplyTo] = useState('ab2@o2i.tech');
+  const [attachmentFile, setAttachmentFile] = useState(null);
+
+  // Dispatch / Sending state
+  const [isSending, setIsSending] = useState(false);
+  const [activeCampaignResult, setActiveCampaignResult] = useState(null);
+  const [trackingStatus, setTrackingStatus] = useState(null);
+
+  // Templates state
+  const [templates, setTemplates] = useState([]);
+  const [_loadingTemplates, setLoadingTemplates] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+
+  // Notices
+  const [notice, setNotice] = useState('');
+  const [noticeType, setNoticeType] = useState('success');
+
   const emailSubjectRef = useRef(null);
   const emailBodyRef = useRef(null);
   const visualEditorRef = useRef(null);
@@ -147,60 +201,6 @@ export const ContentStudioPage = () => {
       setEmailSubject(prev => prev + ' ' + token);
     }
   };
-
-  // AI Generation inputs
-  const [aiIndustry, setAiIndustry] = useState('Automotive');
-  const [aiTone, setAiTone] = useState('EXECUTIVE');
-  const [aiTopic, setAiTopic] = useState('ERP Modernisation & AI Supply Chain Integration');
-  const [aiCta, setAiCta] = useState('Schedule a 15-min Architecture Review');
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Email Composer state
-  const [campaignName, setCampaignName] = useState('Oxygen to Innovation - Executive Outreach');
-  const [emailSubject, setEmailSubject] = useState('A practical path to faster exception settlement | Oxygen to Innovation');
-  const [emailBodyHtml, setEmailBodyHtml] = useState(
-`<p>Hi {{firstName}},</p>
-<p>Organizations across the industry are under growing pressure to accelerate throughput, strengthen operational resilience, and maintain real-time visibility across complex business workflows.</p>
-
-<p>At <strong>Oxygen to Innovation</strong>, our Enterprise AI Platform connects your operational workflows directly with intelligent document intake, automated compliance checks, and enterprise-grade exception routing. By verifying incoming files against corporate business rules in real time, teams eliminate repetitive manual data re-entry while maintaining strict audit governance.</p>
-
-<p>For {{company}}, a practical modernization engagement focuses on four high-impact areas:</p>
-<ul>
-  <li><strong>ERP & Core Touchpoints:</strong> Bi-directional synchronization minimizing manual transcription latency.</li>
-  <li><strong>Autonomous Exception Routing:</strong> Intelligent exception queues with customizable approval controls and audit trails.</li>
-  <li><strong>Predictive Analytics:</strong> Real-time tracking of operational cycle times, exception frequency, and SLA performance.</li>
-  <li><strong>Enterprise Security:</strong> Role-based access control, SOC2/ISO compliance, and complete data residency.</li>
-</ul>
-
-<p>We have prepared a targeted solution brief and reference architecture outlining a focused, phased rollout for engineering and operational leadership.</p>
-
-<p><a href="https://o2i.tech"><strong>Schedule a 15-Minute Architecture Review</strong></a>, or reply with a convenient time that suits your calendar this week.</p>
-
-<p>Best regards,<br/><strong>{{senderName}}</strong><br/>Oxygen to Innovation</p>
-<p><small style="color: #6b7280;">If this topic is outside your current mandate, reply with your preferences and we will update our records immediately.</small></p>`
-  );
-  const [fromEmail, setFromEmail] = useState('');
-  const [defaultSender, setDefaultSender] = useState('');
-  const [allowedSenders, setAllowedSenders] = useState([]);
-  const [senderName, setSenderName] = useState('Oxygen to Innovation');
-  const [replyTo, setReplyTo] = useState('ab2@o2i.tech');
-  const [attachmentFile, setAttachmentFile] = useState(null);
-
-  // Dispatch / Sending state
-  const [isSending, setIsSending] = useState(false);
-  const [activeCampaignResult, setActiveCampaignResult] = useState(null);
-  const [trackingStatus, setTrackingStatus] = useState(null);
-
-  // Templates state
-  const [templates, setTemplates] = useState([]);
-  const [_loadingTemplates, setLoadingTemplates] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
-  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
-
-  // Notices
-  const [notice, setNotice] = useState('');
-  const [noticeType, setNoticeType] = useState('success');
 
   const showFeedback = (msg, type = 'success') => {
     setNotice(msg);
