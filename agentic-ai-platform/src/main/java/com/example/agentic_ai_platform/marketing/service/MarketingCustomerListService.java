@@ -16,7 +16,12 @@ public interface MarketingCustomerListService {
     CustomerListResponse update(UUID tenantId, UUID id, CustomerListRequest request);
     void delete(UUID tenantId, UUID id);
     List<MarketingContactResponse> contacts(UUID tenantId);
-    ContactImportResponse importContacts(UUID tenantId, MultipartFile file);
+    ContactImportResponse importContacts(UUID tenantId, MultipartFile file, String folderName, UUID targetListId);
+    default ContactImportResponse importContacts(UUID tenantId, MultipartFile file) {
+        return importContacts(tenantId, file, null, null);
+    }
+    void deleteAllContacts(UUID tenantId);
+    void deleteContact(UUID tenantId, UUID contactId);
     CustomerListResponse generate(UUID tenantId, AiCustomerListRequest request);
     List<MarketingContactResponse> members(UUID tenantId, UUID listId);
 }

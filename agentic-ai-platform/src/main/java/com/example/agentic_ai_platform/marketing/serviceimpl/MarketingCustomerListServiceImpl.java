@@ -104,6 +104,11 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
 
     @Override
     public ContactImportResponse importContacts(UUID tenantId, MultipartFile file) {
+        return importContacts(tenantId, file, null, null);
+    }
+
+    @Override
+    public ContactImportResponse importContacts(UUID tenantId, MultipartFile file, String folderName, UUID targetListId) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV file is required");
         }
@@ -197,7 +202,53 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
                     "Tenant contact limit of " + maxTotalContacts + " would be exceeded");
         }
         contacts.saveAll(importedContacts);
-        return new ContactImportResponse(importedContacts.size(), duplicates, invalid, processed, errors);
+
+        UUID folderId = null;
+        String resolvedFolderName = null;
+        if (folderName != null && !folderName.trim().isBlank()) {
+            resolvedFolderName = folderName.trim();
+            CustomerListRequest listReq = new CustomerListRequest(
+                    resolvedFolderName,
+                    "Imported folder from " + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "CSV file"),
+                    importedContacts.size(),
+                    BigDecimal.ZERO.setScale(2),
+                    "Imported Folder",
+                    "ACTIVE",
+                    false
+            );
+            MarketingCustomerList customerList = new MarketingCustomerList(UUID.randomUUID(), tenantId, listReq);
+            customerList.addMembers(new HashSet<>(importedContacts));
+            MarketingCustomerList saved = repository.save(customerList);
+            folderId = saved.getId();
+        } else if (targetListId != null) {
+            MarketingCustomerList customerList = findForTenant(tenantId, targetListId);
+            customerList.addMembers(new HashSet<>(importedContacts));
+            MarketingCustomerList saved = repository.save(customerList);
+            folderId = saved.getId();
+            resolvedFolderName = saved.getName();
+        }
+
+        return new ContactImportResponse(importedContacts.size(), duplicates, invalid, processed, errors, folderId, resolvedFolderName);
+    }
+
+    @Override
+    public void deleteAllContacts(UUID tenantId) {
+        List<MarketingCustomerList> tenantLists = repository.findAllByTenantIdOrderByUpdatedAtDesc(tenantId);
+        for (MarketingCustomerList list : tenantLists) {
+            list.getMembers().clear();
+            CustomerListRequest updateReq = new CustomerListRequest(
+                    list.getName(), list.getDescription(), 0, list.getConversionRate(),
+                    list.getSegment(), list.getStatus(), list.isAiGenerated()
+            );
+            list.updateFrom(updateReq);
+        }
+        repository.saveAll(tenantLists);
+        contacts.deleteAllByTenantId(tenantId);
+    }
+
+    @Override
+    public void deleteContact(UUID tenantId, UUID contactId) {
+        contacts.deleteByTenantIdAndId(tenantId, contactId);
     }
 
     @Override

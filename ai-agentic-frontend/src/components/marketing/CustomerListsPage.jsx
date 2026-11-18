@@ -9,7 +9,8 @@ import {
 import { setActiveRoute } from '../../store/navigationSlice';
 import {
   List, Users, Target, Zap, CheckCircle, Cpu, Plus,
-  Trash2, RefreshCw, X, Check, AlertCircle, Upload, Sparkles
+  Trash2, RefreshCw, X, Check, AlertCircle, Upload, Sparkles,
+  Folder, FolderPlus
 } from 'lucide-react';
 import {
   listCustomerLists,
@@ -17,6 +18,8 @@ import {
   updateCustomerList,
   deleteCustomerList,
   importContacts,
+  deleteAllContacts,
+  deleteContact,
   listContacts,
   aiGenerateCustomerList,
   getCustomerListContacts,
@@ -82,6 +85,10 @@ export const CustomerListsPage = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [csvFile, setCsvFile]           = useState(null);
   const [importing, setImporting]       = useState(false);
+  const [importMode, setImportMode]     = useState('new'); // 'new' | 'existing' | 'none'
+  const [importFolderName, setImportFolderName] = useState('');
+  const [importTargetListId, setImportTargetListId] = useState('');
+  const [deletingAll, setDeletingAll]   = useState(false);
   const csvInputRef = useRef(null);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -274,23 +281,53 @@ export const CustomerListsPage = () => {
     }
   };
 
+  const handleFileSelect = (file) => {
+    setCsvFile(file);
+    if (file && (!importFolderName || importFolderName.trim() === '')) {
+      const cleanName = file.name
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase())
+        .trim();
+      setImportFolderName(cleanName || 'Imported Contacts Folder');
+    }
+  };
+
   // ── Import Contacts CSV ───────────────────────────────────────────────────
   const handleImport = async (e) => {
     e.preventDefault();
-    if (!csvFile) { showNotice('Please select a CSV file.', 'error'); return; }
+    if (!csvFile) { showNotice('Please select a CSV or TSV file.', 'error'); return; }
+    if (importMode === 'new' && !importFolderName.trim()) {
+      showNotice('Please enter a folder name or choose another option.', 'error');
+      return;
+    }
+    if (importMode === 'existing' && !importTargetListId) {
+      showNotice('Please select an existing folder/list to import into.', 'error');
+      return;
+    }
+
     setImporting(true);
     try {
-      const res = await importContacts(csvFile);
-      await handleFetchContacts();
+      const folderParam = importMode === 'new' ? importFolderName.trim() : '';
+      const targetParam = importMode === 'existing' ? importTargetListId : '';
+      const res = await importContacts(csvFile, folderParam, targetParam);
+      await Promise.all([handleFetchContacts(), handleFetchLists()]);
       setIsImportOpen(false);
       setCsvFile(null);
+      setImportFolderName('');
+      setImportTargetListId('');
+      setImportMode('new');
       if (csvInputRef.current) csvInputRef.current.value = '';
       setActiveTab('contacts');
 
       const count = typeof res?.imported === 'number' ? res.imported : (Array.isArray(res) ? res.length : 0);
       const dup = res?.duplicates || 0;
       const inv = res?.invalid || 0;
-      let msg = `${count} contact${count !== 1 ? 's' : ''} imported successfully.`;
+      let msg = `${count} contact${count !== 1 ? 's' : ''} imported successfully`;
+      if (res?.folderName) {
+        msg += ` into folder "${res.folderName}"`;
+      }
+      msg += '.';
       if (dup > 0) msg += ` (${dup} duplicate${dup > 1 ? 's' : ''} skipped)`;
       if (inv > 0) msg += ` (${inv} invalid row${inv > 1 ? 's' : ''})`;
       if (res?.errors?.length > 0) {
@@ -301,6 +338,36 @@ export const CustomerListsPage = () => {
       showNotice(`Import failed: ${err.message}`, 'error');
     } finally {
       setImporting(false);
+    }
+  };
+
+  // ── Delete All Imported Contacts ──────────────────────────────────────────
+  const handleDeleteAllContacts = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL imported contacts? This will permanently delete all contacts and remove them from all customer lists.')) {
+      return;
+    }
+    setDeletingAll(true);
+    try {
+      await deleteAllContacts();
+      await Promise.all([handleFetchContacts(), handleFetchLists()]);
+      showNotice('All imported contacts have been cleared.', 'success');
+    } catch (err) {
+      showNotice(`Failed to clear contacts: ${err.message}`, 'error');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  // ── Delete Single Contact ─────────────────────────────────────────────────
+  const handleDeleteContact = async (contact) => {
+    if (!contact?.id) return;
+    if (!window.confirm(`Delete contact "${contact.email || contact.company || 'selected'}"?`)) return;
+    try {
+      await deleteContact(contact.id);
+      setContacts(prev => prev.filter(c => c.id !== contact.id));
+      showNotice(`Contact ${contact.email || ''} deleted.`);
+    } catch (err) {
+      showNotice(`Failed to delete contact: ${err.message}`, 'error');
     }
   };
 
@@ -585,19 +652,30 @@ export const CustomerListsPage = () => {
       {/* ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'contacts' && (
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
             <div>
               <div className="card-title"><Users size={14} /> Imported Contacts</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                All tenant contacts available to AI list generation.
+                All tenant contacts available to AI list generation across folders.
                 <span className="mono" style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-muted)' }}>GET /api/marketing/contacts</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-ghost btn-sm" onClick={handleFetchContacts} disabled={contactsLoading}>
                 <RefreshCw size={13} style={contactsLoading ? { animation: 'spin 1s linear infinite' } : {}} /> Refresh
               </button>
-              <button className="btn btn-solid btn-sm" style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff' }} onClick={() => setIsImportOpen(true)}>
+              {contacts.length > 0 && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', gap: 5 }}
+                  onClick={handleDeleteAllContacts}
+                  disabled={deletingAll}
+                  title="Delete all imported contacts"
+                >
+                  <Trash2 size={13} /> {deletingAll ? 'Deleting...' : 'Delete All Contacts'}
+                </button>
+              )}
+              <button className="btn btn-solid btn-sm" style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setIsImportOpen(true)}>
                 <Upload size={13} /> Import CSV
               </button>
             </div>
@@ -630,6 +708,7 @@ export const CustomerListsPage = () => {
                     <th>Revenue</th>
                     <th>Status</th>
                     <th className="mono" style={{ color: 'var(--text-muted)' }}>Churn %</th>
+                    <th style={{ textAlign: 'center', width: 50 }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -664,6 +743,16 @@ export const CustomerListsPage = () => {
                       </td>
                       <td className="mono" style={{ fontSize: 12, color: c.churnProbability > 70 ? '#dc2626' : c.churnProbability > 40 ? '#d97706' : 'var(--text-primary)' }}>
                         {c.churnProbability != null ? `${c.churnProbability}%` : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          style={{ color: '#ef4444', padding: '4px 6px', opacity: 0.8 }}
+                          title="Delete contact"
+                          onClick={() => handleDeleteContact(c)}
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -771,22 +860,30 @@ export const CustomerListsPage = () => {
             </div>
             <form onSubmit={handleAiGenerate}>
               <div className="form-group">
-                <label className="form-label">Source Audience</label>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Folder size={14} color="#6366f1" /> Source Audience / Folder
+                </label>
                 <select
                   className="input"
                   value={aiSourceListId}
                   onChange={e => setAiSourceListId(e.target.value)}
                   disabled={aiLoading}
                 >
-                  <option value="">All Imported Contacts ({contacts.length} total)</option>
+                  <option value="">🌐 All Imported Contacts ({contacts.length} total)</option>
                   {lists.map(l => (
                     <option key={l.id} value={l.id}>
-                      Saved List: {l.name} ({l.count || 0} contacts)
+                      📁 Folder: {l.name} ({l.count || 0} contacts)
                     </option>
                   ))}
                 </select>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Filter from all imported contacts or narrow down from an existing saved list.
+                  {aiSourceListId ? (
+                    <span style={{ color: '#6366f1', fontWeight: 500 }}>
+                      🎯 AI will filter and select records ONLY from folder: "<strong>{lists.find(l => l.id === aiSourceListId)?.name}</strong>"
+                    </span>
+                  ) : (
+                    'Filter across all contacts in the database or select a specific imported folder above.'
+                  )}
                 </div>
               </div>
 
@@ -871,7 +968,84 @@ export const CustomerListsPage = () => {
                     </div>
                   )}
                   <input ref={csvInputRef} type="file" accept=".csv,text/csv,.tsv,text/tab-separated-values,.txt" style={{ display: 'none' }}
-                    onChange={e => setCsvFile(e.target.files?.[0] || null)} />
+                    onChange={e => handleFileSelect(e.target.files?.[0] || null)} />
+                </div>
+              </div>
+
+              {/* Folder / List Organization */}
+              <div style={{ marginBottom: 18, padding: '12px 14px', borderRadius: 8, background: 'var(--bg-card, rgba(255,255,255,0.03))', border: '1px solid var(--border-default)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Folder size={14} color="#6366f1" /> Organize into Folder / Customer List
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="new"
+                      checked={importMode === 'new'}
+                      onChange={() => setImportMode('new')}
+                    />
+                    <span style={{ fontWeight: 500 }}>Create a new Folder / Customer List</span>
+                  </label>
+                  {importMode === 'new' && (
+                    <div style={{ marginLeft: 22, marginTop: -2, marginBottom: 4 }}>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. Ontario Healthcare Directory, Canada Clinics 2026"
+                        value={importFolderName}
+                        onChange={e => setImportFolderName(e.target.value)}
+                        required={importMode === 'new'}
+                        style={{ fontSize: 12 }}
+                      />
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                        A new customer list folder will be created so you can later target/filter it directly in AI Generate.
+                      </div>
+                    </div>
+                  )}
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="existing"
+                      checked={importMode === 'existing'}
+                      onChange={() => setImportMode('existing')}
+                      disabled={lists.length === 0}
+                    />
+                    <span style={{ fontWeight: 500 }}>Add to an existing Folder / List {lists.length === 0 ? '(No existing lists)' : ''}</span>
+                  </label>
+                  {importMode === 'existing' && (
+                    <div style={{ marginLeft: 22, marginTop: -2, marginBottom: 4 }}>
+                      <select
+                        className="input"
+                        value={importTargetListId}
+                        onChange={e => setImportTargetListId(e.target.value)}
+                        required={importMode === 'existing'}
+                        style={{ fontSize: 12 }}
+                      >
+                        <option value="">-- Choose Existing Folder / List --</option>
+                        {lists.map(l => (
+                          <option key={l.id} value={l.id}>
+                            📁 {l.name} ({l.count || 0} contacts)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="none"
+                      checked={importMode === 'none'}
+                      onChange={() => setImportMode('none')}
+                    />
+                    <span style={{ fontWeight: 500 }}>Import to Global Pool only (no folder)</span>
+                  </label>
                 </div>
               </div>
 

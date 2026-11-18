@@ -8,7 +8,9 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -42,8 +44,24 @@ public class MarketingContactController {
 
     @PostMapping("/import")
     @ResponseStatus(HttpStatus.CREATED)
-    public ContactImportResponse importContacts(@RequestParam("file") MultipartFile file, JwtAuthenticationToken auth) {
-        return customerLists.importContacts(tenantId(auth), file);
+    public ContactImportResponse importContacts(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "folderName", required = false) String folderName,
+            @RequestParam(value = "targetListId", required = false) UUID targetListId,
+            JwtAuthenticationToken auth) {
+        return customerLists.importContacts(tenantId(auth), file, folderName, targetListId);
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAllContacts(JwtAuthenticationToken auth) {
+        customerLists.deleteAllContacts(tenantId(auth));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteContact(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        customerLists.deleteContact(tenantId(auth), id);
     }
 
     private UUID tenantId(JwtAuthenticationToken auth) {

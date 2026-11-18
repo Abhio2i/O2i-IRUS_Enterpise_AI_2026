@@ -503,11 +503,17 @@ export async function deleteDocument(documentId) {
  *   industry, country, annualRevenue, customerStatus, churnProbability
  * Status: 200 OK — returns array of imported contact objects
  */
-export async function importContacts(file) {
+export async function importContacts(file, folderName = '', targetListId = '') {
   if (!file) throw new Error('CSV file is required');
 
   const formData = new FormData();
   formData.append('file', file);
+  if (folderName && folderName.trim()) {
+    formData.append('folderName', folderName.trim());
+  }
+  if (targetListId && targetListId.trim()) {
+    formData.append('targetListId', targetListId.trim());
+  }
 
   let headers = getAuthHeaders();
 
@@ -538,6 +544,65 @@ export async function importContacts(file) {
 
   const data = await res.json();
   return data;
+}
+
+/**
+ * Delete All Imported Contacts for Tenant
+ * DELETE /api/marketing/contacts
+ */
+export async function deleteAllContacts() {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/contacts`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        headers = getAuthHeaders();
+        res = await fetch(`${BACKEND_URL}/api/marketing/contacts`, {
+          method: 'DELETE',
+          headers,
+        });
+      }
+    } catch {}
+  }
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to delete all contacts');
+    throw new Error(err);
+  }
+  return true;
+}
+
+/**
+ * Delete Single Contact
+ * DELETE /api/marketing/contacts/:id
+ */
+export async function deleteContact(id) {
+  if (!id) throw new Error('Contact ID is required');
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/contacts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        headers = getAuthHeaders();
+        res = await fetch(`${BACKEND_URL}/api/marketing/contacts/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers,
+        });
+      }
+    } catch {}
+  }
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to delete contact');
+    throw new Error(err);
+  }
+  return true;
 }
 
 /**
