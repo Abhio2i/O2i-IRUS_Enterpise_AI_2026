@@ -1447,6 +1447,8 @@ export async function sendBulkCampaign({
   fromEmail = '',
   senderName = 'Oxygen to Innovation',
   replyTo = 'ab2@o2i.tech',
+  cc = '',
+  bcc = '',
   variables = ['firstName', 'lastName', 'company', 'senderName', 'email'],
   attachment = null,
 }) {
@@ -1467,6 +1469,8 @@ export async function sendBulkCampaign({
   if (fromEmail) formData.append('fromEmail', fromEmail);
   if (senderName) formData.append('senderName', senderName);
   if (replyTo) formData.append('replyTo', replyTo);
+  if (cc && cc.trim()) formData.append('cc', cc.trim());
+  if (bcc && bcc.trim()) formData.append('bcc', bcc.trim());
 
   if (Array.isArray(variables)) {
     variables.forEach((v) => formData.append('variables', v));

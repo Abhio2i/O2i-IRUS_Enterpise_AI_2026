@@ -107,6 +107,10 @@ export const ContentStudioPage = () => {
   const [allowedSenders, setAllowedSenders] = useState([]);
   const [senderName, setSenderName] = useState('Oxygen to Innovation');
   const [replyTo, setReplyTo] = useState('ab2@o2i.tech');
+  const [ccEmails, setCcEmails] = useState('');
+  const [bccEmails, setBccEmails] = useState('');
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
 
   // Dispatch / Sending state
@@ -544,6 +548,8 @@ export const ContentStudioPage = () => {
         fromEmail: effectiveFrom,
         senderName,
         replyTo,
+        cc: ccEmails.trim() || undefined,
+        bcc: bccEmails.trim() || undefined,
         variables: ['firstName', 'lastName', 'company', 'senderName', 'email'],
         attachment: attachmentFile,
       });
@@ -1132,7 +1138,33 @@ export const ContentStudioPage = () => {
               </div>
 
               <div>
-                <label className="form-label">Reply-To Email</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Reply-To Email</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {!showCc && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand-primary, #2563eb)', padding: '2px 8px', borderRadius: 4, background: 'rgba(37, 99, 235, 0.08)' }}
+                        onClick={() => setShowCc(true)}
+                        title="Add Cc (Carbon Copy - visible to all recipients)"
+                      >
+                        + Cc
+                      </button>
+                    )}
+                    {!showBcc && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ fontSize: 11, fontWeight: 600, color: '#059669', padding: '2px 8px', borderRadius: 4, background: 'rgba(5, 150, 105, 0.08)' }}
+                        onClick={() => setShowBcc(true)}
+                        title="Add Bcc (Blind Carbon Copy - hidden from recipients)"
+                      >
+                        + Bcc
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <input
                   type="email"
                   className="input"
@@ -1141,6 +1173,68 @@ export const ContentStudioPage = () => {
                   placeholder="ab2@o2i.tech"
                 />
               </div>
+
+              {showCc && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, background: 'var(--bg-hover)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ background: '#2563eb', color: '#fff', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>Cc</span>
+                      <span>Carbon Copy (Gmail Style — recipients can see each other)</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      onClick={() => { setShowCc(false); setCcEmails(''); }}
+                      style={{ fontSize: 11, padding: '1px 6px', color: 'var(--text-muted)' }}
+                      title="Remove Cc field"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter email addresses separated by commas (e.g. manager@o2i.tech, partner@company.com)"
+                    value={ccEmails}
+                    onChange={e => setCcEmails(e.target.value)}
+                    style={{ fontSize: 12 }}
+                  />
+                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                    Recipients will see these email addresses in the Cc header.
+                  </div>
+                </div>
+              )}
+
+              {showBcc && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, background: 'var(--bg-hover)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ background: '#059669', color: '#fff', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>Bcc</span>
+                      <span>Blind Carbon Copy (Gmail Style — completely hidden from recipients)</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      onClick={() => { setShowBcc(false); setBccEmails(''); }}
+                      style={{ fontSize: 11, padding: '1px 6px', color: 'var(--text-muted)' }}
+                      title="Remove Bcc field"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter email addresses separated by commas (e.g. crm-inbox@o2i.tech, audit@o2i.tech)"
+                    value={bccEmails}
+                    onChange={e => setBccEmails(e.target.value)}
+                    style={{ fontSize: 12 }}
+                  />
+                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                    Recipients will NOT see these email addresses (confidential CRM / manager loop).
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
@@ -1473,6 +1567,12 @@ export const ContentStudioPage = () => {
                         <strong>{previewRecipient.email}</strong> ({previewRecipient.firstName} {previewRecipient.lastName || ''} @ {previewRecipient.company})
                       </div>
                     </div>
+                    {(ccEmails.trim() || bccEmails.trim()) && (
+                      <div style={{ display: 'flex', gap: 12, fontSize: 11, marginBottom: 8, paddingBottom: 6, borderBottom: '1px dashed var(--border-subtle)', color: 'var(--text-muted)' }}>
+                        {ccEmails.trim() && <div><strong style={{ color: '#2563eb' }}>Cc:</strong> {ccEmails.trim()}</div>}
+                        {bccEmails.trim() && <div><strong style={{ color: '#059669' }}>Bcc:</strong> {bccEmails.trim()}</div>}
+                      </div>
+                    )}
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border-subtle)' }}>
                       Subject: {renderedSubject}
                     </div>
@@ -1497,6 +1597,12 @@ export const ContentStudioPage = () => {
                     {activeCampaignResult.status === 'FAILED' ? '✕ Campaign Failed' : '✓ Campaign Accepted'} — ID: {activeCampaignResult.campaignId || 'CMP-QUEUED'}
                   </div>
                   <div>Recipients: {activeCampaignResult.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length)} contacts ({audienceType === 'DIRECT' ? directEmail : (audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List'))})</div>
+                  {activeCampaignResult.cc && activeCampaignResult.cc.length > 0 && (
+                    <div>Cc: <strong>{activeCampaignResult.cc.join(', ')}</strong></div>
+                  )}
+                  {activeCampaignResult.bcc && activeCampaignResult.bcc.length > 0 && (
+                    <div>Bcc: <strong>{activeCampaignResult.bcc.join(', ')}</strong></div>
+                  )}
                   {activeCampaignResult.sent !== undefined && (
                     <div>Sent: <strong>{activeCampaignResult.sent}</strong> · Failed: <strong>{activeCampaignResult.failed || 0}</strong></div>
                   )}

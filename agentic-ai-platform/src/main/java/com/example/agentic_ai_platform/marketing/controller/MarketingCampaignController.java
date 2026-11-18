@@ -59,8 +59,21 @@ public class MarketingCampaignController {
             String contentHtml,
             String senderName,
             String replyTo,
+            String cc,
+            String bcc,
             List<String> variables
     ) {}
+
+    private String[] parseEmailList(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new String[0];
+        }
+        return Arrays.stream(raw.split("[,;\\s]+"))
+                .map(String::trim)
+                .filter(s -> !s.isBlank() && s.contains("@") && s.contains("."))
+                .distinct()
+                .toArray(String[]::new);
+    }
 
     public record CampaignState(
             UUID campaignId,
@@ -139,12 +152,17 @@ public class MarketingCampaignController {
             @RequestParam String subject, @RequestParam String contentHtml,
             @RequestParam(required = false) String fromEmail, @RequestParam(required = false) String senderName,
             @RequestParam(required = false) String replyTo,
+            @RequestParam(required = false) String cc,
+            @RequestParam(required = false) String bcc,
             @RequestParam(required = false) List<String> variables,
             @RequestPart(value = "attachment", required = false) MultipartFile attachment,
             JwtAuthenticationToken auth) {
-        SendBulkRequest request = new SendBulkRequest(campaignName, targetDomain, subject, contentHtml, senderName, replyTo, variables);
+        SendBulkRequest request = new SendBulkRequest(campaignName, targetDomain, subject, contentHtml, senderName, replyTo, cc, bcc, variables);
         UUID tenant = tenantId(auth);
         UUID campaignId = UUID.randomUUID();
+
+        final String[] ccAddresses = parseEmailList(cc);
+        final String[] bccAddresses = parseEmailList(bcc);
 
         String effectiveFrom = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail.trim() : fromAddress.trim();
 
@@ -216,6 +234,12 @@ public class MarketingCampaignController {
                     helper.setFrom(effectiveFrom);
                 }
                 helper.setTo(contact.email());
+                if (ccAddresses.length > 0) {
+                    helper.setCc(ccAddresses);
+                }
+                if (bccAddresses.length > 0) {
+                    helper.setBcc(bccAddresses);
+                }
                 helper.setSubject(personalizedSubject);
                 helper.setText(html, true);
                 if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
@@ -255,6 +279,8 @@ public class MarketingCampaignController {
             responseMap.put("sent", sent);
             responseMap.put("failed", (sent == 1 ? 0 : 1));
             responseMap.put("dispatchedAt", now.toString());
+            if (ccAddresses.length > 0) responseMap.put("cc", ccAddresses);
+            if (bccAddresses.length > 0) responseMap.put("bcc", bccAddresses);
             if (lastError != null) responseMap.put("errorDetail", lastError);
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(responseMap);
         }
@@ -286,6 +312,12 @@ public class MarketingCampaignController {
                         helper.setFrom(effectiveFrom);
                     }
                     helper.setTo(contact.email());
+                    if (ccAddresses.length > 0) {
+                        helper.setCc(ccAddresses);
+                    }
+                    if (bccAddresses.length > 0) {
+                        helper.setBcc(bccAddresses);
+                    }
                     helper.setSubject(personalizedSubject);
                     helper.setText(html, true);
                     if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
@@ -357,6 +389,8 @@ public class MarketingCampaignController {
         responseMap.put("pauseSeconds", pauseSeconds);
         responseMap.put("rateLimitPolicy", "GoDaddy Safe Mode: " + batchSize + " emails/min with " + pauseSeconds + "s pause between batches");
         responseMap.put("dispatchedAt", now.toString());
+        if (ccAddresses.length > 0) responseMap.put("cc", ccAddresses);
+        if (bccAddresses.length > 0) responseMap.put("bcc", bccAddresses);
         if (mailHost == null || mailHost.isBlank()) {
             responseMap.put("note", "SMTP_HOST not set on server; delivery simulated with rate limiting.");
         }
