@@ -33,9 +33,20 @@ export const ContentStudioPage = () => {
   const [backendCampaigns, setBackendCampaigns] = useState([]);
 
   // Audience targeting state
-  const [audienceType, setAudienceType] = useState('DOMAIN'); // 'DOMAIN' | 'LIST' | 'DIRECT'
+  const [audienceType, setAudienceType] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('selectedCampaignListId')) return 'LIST';
+      if (localStorage.getItem('selectedDirectContact')) return 'DIRECT';
+    }
+    return 'DOMAIN';
+  });
   const [targetDomain, setTargetDomain] = useState('volvo.se');
-  const [selectedListId, setSelectedListId] = useState('');
+  const [selectedListId, setSelectedListId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedCampaignListId') || '';
+    }
+    return '';
+  });
   const [savedLists, setSavedLists] = useState([]);
   const [matchedContacts, setMatchedContacts] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -44,6 +55,15 @@ export const ContentStudioPage = () => {
   const [directLastName, setDirectLastName] = useState('');
   const [directCompany, setDirectCompany] = useState('Oxygen to Innovation');
   const [syncedProposal, setSyncedProposal] = useState(null);
+
+  const audienceTypeRef = useRef(audienceType);
+  const changeAudienceType = (newType) => {
+    audienceTypeRef.current = newType;
+    setAudienceType(newType);
+  };
+  useEffect(() => {
+    audienceTypeRef.current = audienceType;
+  }, [audienceType]);
 
   // Marketing Assets for Brochure / Catalog Grounding
   const [marketingAssets, setMarketingAssets] = useState([]);
@@ -210,34 +230,52 @@ export const ContentStudioPage = () => {
 
   // Fetch contacts matching domain
   const fetchDomainContacts = async (domainToSearch) => {
-    if (!domainToSearch || !domainToSearch.trim()) return;
+    if (audienceTypeRef.current !== 'DOMAIN') return;
+    if (!domainToSearch || !domainToSearch.trim()) {
+      if (audienceTypeRef.current === 'DOMAIN') setMatchedContacts([]);
+      return;
+    }
     setLoadingContacts(true);
     try {
       const data = await getContactsByDomain(domainToSearch);
-      setMatchedContacts(Array.isArray(data) ? data : []);
+      if (audienceTypeRef.current === 'DOMAIN') {
+        setMatchedContacts(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.warn('Domain search notice:', err.message);
-      setMatchedContacts([]);
+      if (audienceTypeRef.current === 'DOMAIN') {
+        setMatchedContacts([]);
+      }
     } finally {
-      setLoadingContacts(false);
+      if (audienceTypeRef.current === 'DOMAIN') {
+        setLoadingContacts(false);
+      }
     }
   };
 
   // Fetch contacts from a saved list
   const fetchListContacts = async (listId) => {
+    if (audienceTypeRef.current !== 'LIST') return;
     if (!listId) {
-      setMatchedContacts([]);
+      if (audienceTypeRef.current === 'LIST') setMatchedContacts([]);
       return;
     }
     setLoadingContacts(true);
     try {
       const data = await getCustomerListContacts(listId);
-      setMatchedContacts(Array.isArray(data) ? data : []);
+      if (audienceTypeRef.current === 'LIST') {
+        setMatchedContacts(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.warn('List contacts notice:', err.message);
-      setMatchedContacts([]);
+      if (audienceTypeRef.current === 'LIST') {
+        setMatchedContacts([]);
+        showFeedback(`Failed to load list contacts: ${err.message}`, 'error');
+      }
     } finally {
-      setLoadingContacts(false);
+      if (audienceTypeRef.current === 'LIST') {
+        setLoadingContacts(false);
+      }
     }
   };
 
@@ -247,6 +285,18 @@ export const ContentStudioPage = () => {
       const data = await listCustomerLists();
       if (Array.isArray(data)) {
         setSavedLists(data);
+        if (data.length > 0) {
+          setSelectedListId(prev => {
+            if (prev && data.some(l => l.id === prev)) {
+              return prev;
+            }
+            const firstId = data[0].id;
+            if (audienceTypeRef.current === 'LIST') {
+              fetchListContacts(firstId);
+            }
+            return firstId;
+          });
+        }
       }
     } catch (err) {
       console.warn('Saved lists fetch notice:', err.message);
@@ -298,7 +348,12 @@ export const ContentStudioPage = () => {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    fetchDomainContacts(targetDomain);
+    const preselectedListId = localStorage.getItem('selectedCampaignListId');
+    const preselectedDirectContactRaw = localStorage.getItem('selectedDirectContact');
+
+    if (!preselectedListId && !preselectedDirectContactRaw && audienceTypeRef.current === 'DOMAIN') {
+      fetchDomainContacts(targetDomain);
+    }
     fetchTemplates();
     fetchSavedLists();
     fetchMarketingAssets();
@@ -324,7 +379,7 @@ export const ContentStudioPage = () => {
     if (prop.bodyHtml) setEmailBodyHtml(prop.bodyHtml);
 
     if (prop.contactEmail && prop.contactEmail.includes('@')) {
-      setAudienceType('DIRECT');
+      changeAudienceType('DIRECT');
       setDirectEmail(prop.contactEmail.trim());
       if (prop.contactName) {
         const parts = prop.contactName.trim().split(/\s+/);
@@ -336,7 +391,7 @@ export const ContentStudioPage = () => {
       }
       if (prop.company) setDirectCompany(prop.company.trim());
     } else if (prop.domain) {
-      setAudienceType('DOMAIN');
+      changeAudienceType('DOMAIN');
       setTargetDomain(prop.domain);
       fetchDomainContacts(prop.domain);
     }
@@ -366,6 +421,8 @@ export const ContentStudioPage = () => {
       }
     } else if (audienceType === 'DOMAIN') {
       fetchDomainContacts(targetDomain);
+    } else if (audienceType === 'DIRECT') {
+      setMatchedContacts([]);
     }
   }, [audienceType, selectedListId]);
 
@@ -375,7 +432,7 @@ export const ContentStudioPage = () => {
     const preselectedListName = localStorage.getItem('selectedCampaignListName');
     if (preselectedListId) {
       setActiveTab('Sender');
-      setAudienceType('LIST');
+      changeAudienceType('LIST');
       setSelectedListId(preselectedListId);
       fetchListContacts(preselectedListId);
       if (preselectedListName) {
@@ -390,7 +447,7 @@ export const ContentStudioPage = () => {
       try {
         const contact = JSON.parse(preselectedDirectContactRaw);
         setActiveTab('Sender');
-        setAudienceType('DIRECT');
+        changeAudienceType('DIRECT');
         setDirectEmail(contact.email || '');
         setDirectFirstName(contact.firstName || '');
         setDirectLastName(contact.lastName || '');
@@ -724,7 +781,7 @@ export const ContentStudioPage = () => {
                     type="button"
                     className={`btn btn-xs ${audienceType === 'DOMAIN' ? 'btn-solid' : 'btn-ghost'}`}
                     style={audienceType === 'DOMAIN' ? { background: 'var(--brand-primary, #2563eb)', color: '#fff', fontSize: 11, padding: '2px 8px' } : { fontSize: 11, padding: '2px 8px' }}
-                    onClick={() => setAudienceType('DOMAIN')}
+                    onClick={() => changeAudienceType('DOMAIN')}
                   >
                     Domain
                   </button>
@@ -733,9 +790,11 @@ export const ContentStudioPage = () => {
                     className={`btn btn-xs ${audienceType === 'LIST' ? 'btn-solid' : 'btn-ghost'}`}
                     style={audienceType === 'LIST' ? { background: 'var(--brand-primary, #2563eb)', color: '#fff', fontSize: 11, padding: '2px 8px' } : { fontSize: 11, padding: '2px 8px' }}
                     onClick={() => {
-                      setAudienceType('LIST');
-                      if (!selectedListId && savedLists.length > 0) {
-                        setSelectedListId(savedLists[0].id);
+                      changeAudienceType('LIST');
+                      const targetId = selectedListId || (savedLists.length > 0 ? savedLists[0].id : '');
+                      if (targetId) {
+                        setSelectedListId(targetId);
+                        fetchListContacts(targetId);
                       }
                     }}
                   >
@@ -745,7 +804,7 @@ export const ContentStudioPage = () => {
                     type="button"
                     className={`btn btn-xs ${audienceType === 'DIRECT' ? 'btn-solid' : 'btn-ghost'}`}
                     style={audienceType === 'DIRECT' ? { background: '#10b981', color: '#fff', fontSize: 11, padding: '2px 8px' } : { fontSize: 11, padding: '2px 8px' }}
-                    onClick={() => setAudienceType('DIRECT')}
+                    onClick={() => changeAudienceType('DIRECT')}
                   >
                     ⚡ Test / Single
                   </button>
@@ -822,7 +881,12 @@ export const ContentStudioPage = () => {
                   <select
                     className="input"
                     value={selectedListId}
-                    onChange={(e) => setSelectedListId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedListId(newId);
+                      if (newId) fetchListContacts(newId);
+                      else setMatchedContacts([]);
+                    }}
                   >
                     <option value="">-- Select Saved List ({savedLists.length}) --</option>
                     {savedLists.map((l) => (
