@@ -1451,6 +1451,7 @@ export async function sendBulkCampaign({
   bcc = '',
   variables = ['firstName', 'lastName', 'company', 'senderName', 'email'],
   attachment = null,
+  attachments = [],
 }) {
   if (!campaignName || !subject || !contentHtml) {
     throw new Error('campaignName, subject, and contentHtml are required');
@@ -1480,6 +1481,14 @@ export async function sendBulkCampaign({
 
   if (attachment) {
     formData.append('attachment', attachment);
+  }
+
+  if (Array.isArray(attachments)) {
+    attachments.forEach((file) => {
+      if (file) formData.append('attachments', file);
+    });
+  } else if (attachments) {
+    formData.append('attachments', attachments);
   }
 
   let headers = getAuthHeaders(); // browser automatically sets boundary for FormData

@@ -77,6 +77,8 @@ public class MarketingCampaignController {
                 .toArray(String[]::new);
     }
 
+    public record CampaignAttachment(String filename, String contentType, byte[] data) {}
+
     public record CampaignState(
             UUID campaignId,
             UUID tenantId,
@@ -158,6 +160,7 @@ public class MarketingCampaignController {
             @RequestParam(required = false) String bcc,
             @RequestParam(required = false) List<String> variables,
             @RequestPart(value = "attachment", required = false) MultipartFile attachment,
+            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments,
             JwtAuthenticationToken auth) {
         SendBulkRequest request = new SendBulkRequest(campaignName, targetDomain, subject, contentHtml, senderName, replyTo, cc, bcc, variables);
         UUID tenant = tenantId(auth);
@@ -199,25 +202,38 @@ public class MarketingCampaignController {
         int total = recipients.size();
         Instant now = Instant.now();
 
-        // Safely extract attachment bytes synchronously before entering background worker
-        final byte[] attachBytes;
-        final String attachName;
-        final String attachContentType;
+        // Safely extract multiple attachment bytes synchronously before entering background worker
+        final List<CampaignAttachment> emailAttachments = new ArrayList<>();
+        long totalAttachmentBytes = 0;
+
         if (attachment != null && !attachment.isEmpty()) {
-            if (attachment.getSize() > 10L * 1024 * 1024) {
-                throw new IllegalArgumentException("Attachment exceeds 10 MiB");
-            }
+            totalAttachmentBytes += attachment.getSize();
             try {
-                attachBytes = attachment.getBytes();
-                attachName = attachment.getOriginalFilename() == null ? "attachment" : attachment.getOriginalFilename().replaceAll("[\\\\/]", "_");
-                attachContentType = attachment.getContentType() == null ? "application/octet-stream" : attachment.getContentType();
+                String aName = attachment.getOriginalFilename() == null ? "attachment" : attachment.getOriginalFilename().replaceAll("[\\\\/]", "_");
+                String aType = attachment.getContentType() == null ? "application/octet-stream" : attachment.getContentType();
+                emailAttachments.add(new CampaignAttachment(aName, aType, attachment.getBytes()));
             } catch (Exception e) {
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read attachment file: " + e.getMessage());
             }
-        } else {
-            attachBytes = null;
-            attachName = null;
-            attachContentType = null;
+        }
+
+        if (attachments != null) {
+            for (MultipartFile file : attachments) {
+                if (file != null && !file.isEmpty()) {
+                    totalAttachmentBytes += file.getSize();
+                    try {
+                        String aName = file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename().replaceAll("[\\\\/]", "_");
+                        String aType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+                        emailAttachments.add(new CampaignAttachment(aName, aType, file.getBytes()));
+                    } catch (Exception e) {
+                        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read attachment file: " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        if (totalAttachmentBytes > 25L * 1024 * 1024) {
+            throw new IllegalArgumentException("Total attachments size exceeds 25 MiB standard email limit");
         }
 
         // Fast path: Single direct recipient (e.g. test email or proposal transmission)
@@ -229,7 +245,7 @@ public class MarketingCampaignController {
                 String html = personalizeHtml(request.contentHtml(), contact, request.senderName());
                 String personalizedSubject = personalizeSubject(request.subject() == null ? "" : request.subject(), contact, request.senderName());
                 var message = mailSender.createMimeMessage();
-                var helper = new MimeMessageHelper(message, "UTF-8");
+                var helper = new MimeMessageHelper(message, true, "UTF-8");
                 if (request.senderName() != null && !request.senderName().isBlank()) {
                     helper.setFrom(effectiveFrom, request.senderName());
                 } else {
@@ -245,8 +261,8 @@ public class MarketingCampaignController {
                 helper.setSubject(personalizedSubject);
                 helper.setText(html, true);
                 if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
-                if (attachBytes != null) {
-                    helper.addAttachment(attachName, new ByteArrayResource(attachBytes), attachContentType);
+                for (CampaignAttachment att : emailAttachments) {
+                    helper.addAttachment(att.filename(), new ByteArrayResource(att.data()), att.contentType());
                 }
 
                 if (mailHost != null && !mailHost.isBlank()) {
@@ -284,6 +300,9 @@ public class MarketingCampaignController {
             if (ccAddresses.length > 0) responseMap.put("cc", ccAddresses);
             if (bccAddresses.length > 0) responseMap.put("bcc", bccAddresses);
             if (lastError != null) responseMap.put("errorDetail", lastError);
+            if (!emailAttachments.isEmpty()) {
+                responseMap.put("attachments", emailAttachments.stream().map(CampaignAttachment::filename).toList());
+            }
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(responseMap);
         }
 
@@ -318,7 +337,7 @@ public class MarketingCampaignController {
                     String html = personalizeHtml(request.contentHtml(), contact, request.senderName());
                     String personalizedSubject = personalizeSubject(request.subject() == null ? "" : request.subject(), contact, request.senderName());
                     var message = mailSender.createMimeMessage();
-                    var helper = new MimeMessageHelper(message, "UTF-8");
+                    var helper = new MimeMessageHelper(message, true, "UTF-8");
                     if (request.senderName() != null && !request.senderName().isBlank()) {
                         helper.setFrom(effectiveFrom, request.senderName());
                     } else {
@@ -334,8 +353,8 @@ public class MarketingCampaignController {
                     helper.setSubject(personalizedSubject);
                     helper.setText(html, true);
                     if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
-                    if (attachBytes != null) {
-                        helper.addAttachment(attachName, new ByteArrayResource(attachBytes), attachContentType);
+                    for (CampaignAttachment att : emailAttachments) {
+                        helper.addAttachment(att.filename(), new ByteArrayResource(att.data()), att.contentType());
                     }
 
                     for (int attempt = 1; attempt <= 2; attempt++) {
@@ -463,6 +482,9 @@ public class MarketingCampaignController {
         responseMap.put("dispatchedAt", now.toString());
         if (ccAddresses.length > 0) responseMap.put("cc", ccAddresses);
         if (bccAddresses.length > 0) responseMap.put("bcc", bccAddresses);
+        if (!emailAttachments.isEmpty()) {
+            responseMap.put("attachments", emailAttachments.stream().map(CampaignAttachment::filename).toList());
+        }
         if (mailHost == null || mailHost.isBlank()) {
             responseMap.put("note", "SMTP_HOST not set on server; delivery simulated with rate limiting.");
         }

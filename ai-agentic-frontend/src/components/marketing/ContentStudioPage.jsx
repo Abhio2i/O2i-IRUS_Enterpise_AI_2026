@@ -5,7 +5,7 @@ import { addAuditLog } from '../../store/governanceSlice';
 import {
   Mail, CheckCircle, ShieldCheck, Send, Eye,
   Globe, RefreshCw, AlertCircle, FileText, Trash2, ArrowRight, Sparkles, Server, Users, Zap,
-  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser, XCircle
+  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser, XCircle, Paperclip
 } from 'lucide-react';
 import {
   getContactsByDomain,
@@ -112,7 +112,7 @@ export const ContentStudioPage = () => {
   const [bccEmails, setBccEmails] = useState('');
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
-  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
 
   // Dispatch / Sending state
   const [isSending, setIsSending] = useState(false);
@@ -408,7 +408,7 @@ export const ContentStudioPage = () => {
         const blob = await getProposalDocumentBlob(prop.proposalId);
         if (blob && blob.size > 0) {
           const file = new File([blob], prop.originalFilename, { type: blob.type || 'application/pdf' });
-          setAttachmentFile(file);
+          setAttachmentFiles([file]);
         }
       } catch (err) {
         console.warn('Could not auto-attach proposal document blob:', err.message);
@@ -553,7 +553,8 @@ export const ContentStudioPage = () => {
         cc: ccEmails.trim() || undefined,
         bcc: bccEmails.trim() || undefined,
         variables: ['firstName', 'lastName', 'company', 'senderName', 'email'],
-        attachment: attachmentFile,
+        attachment: attachmentFiles[0] || null,
+        attachments: attachmentFiles,
       });
 
       setActiveCampaignResult(result);
@@ -1557,33 +1558,107 @@ export const ContentStudioPage = () => {
               </div>
 
               <div>
-                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Attachment (Optional Brochure, Catalog or PDF — Max 10 MiB)</span>
-                  {attachmentFile && (
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Paperclip size={13} style={{ color: '#2563eb' }} />
+                    <strong>Attachments</strong> (Brochures, Images, PDFs, Catalogs — Max 25 MB total)
+                  </span>
+                  {attachmentFiles.length > 0 && (
                     <button
                       type="button"
                       className="btn btn-ghost btn-xs"
-                      style={{ color: '#dc2626', padding: '0 4px', fontSize: 11 }}
-                      onClick={() => setAttachmentFile(null)}
+                      style={{ color: '#dc2626', padding: '0 6px', fontSize: 11, fontWeight: 600 }}
+                      onClick={() => setAttachmentFiles([])}
                     >
-                      ✕ Remove ({attachmentFile.name})
+                      ✕ Clear All ({attachmentFiles.length})
                     </button>
                   )}
                 </label>
+
+                {/* Multi-file Input */}
                 <input
                   type="file"
+                  multiple
                   className="input"
-                  style={{ fontSize: 12, padding: '6px 8px' }}
+                  style={{ fontSize: 12, padding: '7px 10px', width: '100%', cursor: 'pointer' }}
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.zip"
                   onChange={(e) => {
-                    const f = e.target.files?.[0] || null;
-                    if (f && f.size > 10 * 1024 * 1024) {
-                      showFeedback('Attachment must be under 10 MiB', 'error');
-                      e.target.value = '';
-                      return;
-                    }
-                    setAttachmentFile(f);
+                    const newFiles = Array.from(e.target.files || []);
+                    if (newFiles.length === 0) return;
+
+                    setAttachmentFiles(prev => {
+                      const combined = [...prev];
+                      for (const nf of newFiles) {
+                        const existingIdx = combined.findIndex(f => f.name === nf.name && f.size === nf.size);
+                        if (existingIdx >= 0) {
+                          combined[existingIdx] = nf;
+                        } else {
+                          combined.push(nf);
+                        }
+                      }
+                      const totalBytes = combined.reduce((acc, f) => acc + f.size, 0);
+                      if (totalBytes > 25 * 1024 * 1024) {
+                        showFeedback('Total attachments size exceeds 25 MB limit. Please remove some files.', 'error');
+                      }
+                      return combined;
+                    });
+                    e.target.value = '';
                   }}
                 />
+
+                {/* Attached Files Badges */}
+                {attachmentFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {attachmentFiles.map((file, idx) => {
+                      const sizeInKb = (file.size / 1024).toFixed(0);
+                      const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+                      const displaySize = file.size > 1024 * 1024 ? `${sizeInMb} MB` : `${sizeInKb} KB`;
+                      const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+                      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+                      return (
+                        <div
+                          key={`${file.name}-${idx}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '3px 8px',
+                            background: isImg ? 'rgba(147, 51, 234, 0.08)' : (isPdf ? 'rgba(239, 68, 68, 0.08)' : 'rgba(37, 99, 235, 0.08)'),
+                            border: `1px solid ${isImg ? 'rgba(147, 51, 234, 0.25)' : (isPdf ? 'rgba(239, 68, 68, 0.25)' : 'rgba(37, 99, 235, 0.25)')}`,
+                            borderRadius: 6,
+                            fontSize: 11.5,
+                            color: isImg ? '#7e22ce' : (isPdf ? '#dc2626' : '#2563eb'),
+                            fontWeight: 500
+                          }}
+                        >
+                          <span>{isImg ? '🖼️' : (isPdf ? '📄' : '📎')}</span>
+                          <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
+                            {file.name}
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({displaySize})</span>
+                          <button
+                            type="button"
+                            onClick={() => setAttachmentFiles(prev => prev.filter((_, i) => i !== idx))}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '0 2px',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              lineHeight: 1
+                            }}
+                            title="Remove file"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Dynamic Live Preview (Always visible with real recipient or sample fallback) */}
@@ -1643,6 +1718,16 @@ export const ContentStudioPage = () => {
                       <div style={{ display: 'flex', gap: 12, fontSize: 11, marginBottom: 8, paddingBottom: 6, borderBottom: '1px dashed var(--border-subtle)', color: 'var(--text-muted)' }}>
                         {ccEmails.trim() && <div><strong style={{ color: '#2563eb' }}>Cc:</strong> {ccEmails.trim()}</div>}
                         {bccEmails.trim() && <div><strong style={{ color: '#059669' }}>Bcc:</strong> {bccEmails.trim()}</div>}
+                      </div>
+                    )}
+                    {attachmentFiles && attachmentFiles.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, fontSize: 11, marginBottom: 8, paddingBottom: 6, borderBottom: '1px dashed var(--border-subtle)', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ color: '#2563eb', fontWeight: 600 }}>📎 Attachments ({attachmentFiles.length}):</span>
+                        {attachmentFiles.map((f, i) => (
+                          <span key={i} style={{ background: 'var(--bg-elevated)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border-default)' }}>
+                            {f.name}
+                          </span>
+                        ))}
                       </div>
                     )}
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border-subtle)' }}>
@@ -1714,6 +1799,9 @@ export const ContentStudioPage = () => {
                       )}
                       {activeCampaignResult.bcc && activeCampaignResult.bcc.length > 0 && (
                         <div>Bcc: <strong>{activeCampaignResult.bcc.join(', ')}</strong></div>
+                      )}
+                      {activeCampaignResult.attachments && activeCampaignResult.attachments.length > 0 && (
+                        <div>📎 Attachments: <strong>{activeCampaignResult.attachments.join(', ')}</strong></div>
                       )}
                       <div>
                         Sent: <strong>{trackingStatus?.sentCount ?? activeCampaignResult.sent ?? 0}</strong>
