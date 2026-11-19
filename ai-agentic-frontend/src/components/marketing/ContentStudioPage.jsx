@@ -1291,11 +1291,12 @@ export const ContentStudioPage = () => {
                   <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Insert Variable:</span>
                     {[
-                      { token: '{{firstName}}', color: '#4f46e5', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.25)' },
-                      { token: '{{lastName}}', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)', border: 'rgba(2, 132, 199, 0.25)' },
-                      { token: '{{company}}', color: '#059669', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' },
-                      { token: '{{email}}', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.25)' },
-                      { token: '{{senderName}}', color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.1)', border: 'rgba(124, 58, 237, 0.25)' },
+                      { token: '{{company}}', label: '{{company}} (Org / Company)', color: '#059669', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' },
+                      { token: '{{org}}', label: '{{org}}', color: '#059669', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' },
+                      { token: '{{firstName}}', label: '{{firstName}}', color: '#4f46e5', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.25)' },
+                      { token: '{{lastName}}', label: '{{lastName}}', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)', border: 'rgba(2, 132, 199, 0.25)' },
+                      { token: '{{email}}', label: '{{email}}', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.25)' },
+                      { token: '{{senderName}}', label: '{{senderName}}', color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.1)', border: 'rgba(124, 58, 237, 0.25)' },
                     ].map(item => (
                       <button
                         key={item.token}
@@ -1542,17 +1543,23 @@ export const ContentStudioPage = () => {
 
                 const isSample = audienceType !== 'DIRECT' && matchedContacts.length === 0;
 
+                const compValue = (previewRecipient.company && previewRecipient.company !== '—')
+                  ? previewRecipient.company
+                  : ((previewRecipient.parentOrganization && previewRecipient.parentOrganization !== '—')
+                      ? previewRecipient.parentOrganization
+                      : 'Oxygen to Innovation');
+
                 const renderedSubject = (emailSubject || '')
                   .replace(/\{\{firstName\}\}/gi, previewRecipient.firstName || 'Partner')
                   .replace(/\{\{lastName\}\}/gi, previewRecipient.lastName || '')
-                  .replace(/\{\{company\}\}/gi, previewRecipient.company || 'Oxygen to Innovation')
+                  .replace(/\{\{(company|organization|org|orgName|companyName|parentOrganization)\}\}/gi, compValue)
                   .replace(/\{\{email\}\}/gi, previewRecipient.email || 'client@example.com')
                   .replace(/\{\{senderName\}\}/gi, senderName || 'Oxygen to Innovation');
 
                 const renderedHtml = (emailBodyHtml || '')
                   .replace(/\{\{firstName\}\}/gi, `<span style="background: rgba(99,102,241,0.15); padding: 1px 5px; border-radius: 4px; color: #4338ca; font-weight: 600;">${previewRecipient.firstName || 'Partner'}</span>`)
                   .replace(/\{\{lastName\}\}/gi, previewRecipient.lastName ? `<span style="background: rgba(2,132,199,0.15); padding: 1px 5px; border-radius: 4px; color: #0284c7; font-weight: 600;">${previewRecipient.lastName}</span>` : '')
-                  .replace(/\{\{company\}\}/gi, `<span style="background: rgba(16,185,129,0.15); padding: 1px 5px; border-radius: 4px; color: #047857; font-weight: 600;">${previewRecipient.company || 'Oxygen to Innovation'}</span>`)
+                  .replace(/\{\{(company|organization|org|orgName|companyName|parentOrganization)\}\}/gi, `<span style="background: rgba(16,185,129,0.15); padding: 1px 5px; border-radius: 4px; color: #047857; font-weight: 600;">${compValue}</span>`)
                   .replace(/\{\{email\}\}/gi, `<span style="background: rgba(245,158,11,0.15); padding: 1px 5px; border-radius: 4px; color: #b45309; font-weight: 600;">${previewRecipient.email || 'client@example.com'}</span>`)
                   .replace(/\{\{senderName\}\}/gi, senderName || 'Oxygen to Innovation');
 

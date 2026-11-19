@@ -422,35 +422,57 @@ public class MarketingCampaignController {
 
     private String personalizeHtml(String template, MarketingContactResponse contact, String senderName) {
         if (template == null) return "";
-        String fName = (contact.firstName() != null && !contact.firstName().isBlank()) ? contact.firstName().trim() : "Valued Customer";
-        String lName = (contact.lastName() != null && !contact.lastName().isBlank()) ? contact.lastName().trim() : "";
-        String comp = (contact.company() != null && !contact.company().isBlank()) ? contact.company().trim() : "Oxygen to Innovation";
+        String fName = (contact.firstName() != null && !contact.firstName().isBlank() && !contact.firstName().equals("—"))
+                ? contact.firstName().trim() : "Valued Partner";
+        String lName = (contact.lastName() != null && !contact.lastName().isBlank() && !contact.lastName().equals("—"))
+                ? contact.lastName().trim() : "";
+        String comp = (contact.company() != null && !contact.company().isBlank() && !contact.company().equals("—"))
+                ? contact.company().trim()
+                : (contact.parentOrganization() != null && !contact.parentOrganization().isBlank() && !contact.parentOrganization().equals("—")
+                        ? contact.parentOrganization().trim()
+                        : "Valued Organization");
         String em = (contact.email() != null && !contact.email().isBlank()) ? contact.email().trim() : "";
         String sName = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Oxygen to Innovation";
 
         String result = template;
-        result = result.replace("{{firstName}}", html(fName))
-                .replace("{{lastName}}", html(lName))
-                .replace("{{company}}", html(comp))
-                .replace("{{email}}", html(em))
-                .replace("{{senderName}}", html(sName));
+        result = result.replaceAll("(?i)\\{\\{firstName}}", html(fName))
+                .replaceAll("(?i)\\{\\{lastName}}", html(lName))
+                .replaceAll("(?i)\\{\\{company}}", html(comp))
+                .replaceAll("(?i)\\{\\{companyName}}", html(comp))
+                .replaceAll("(?i)\\{\\{organization}}", html(comp))
+                .replaceAll("(?i)\\{\\{org}}", html(comp))
+                .replaceAll("(?i)\\{\\{orgName}}", html(comp))
+                .replaceAll("(?i)\\{\\{parentOrganization}}", html(comp))
+                .replaceAll("(?i)\\{\\{email}}", html(em))
+                .replaceAll("(?i)\\{\\{senderName}}", html(sName));
         return result.replaceAll("\\{\\{[a-zA-Z0-9_]+}}", "");
     }
 
     private String personalizeSubject(String template, MarketingContactResponse contact, String senderName) {
         if (template == null) return "";
-        String fName = (contact.firstName() != null && !contact.firstName().isBlank()) ? contact.firstName().trim() : "Valued Customer";
-        String lName = (contact.lastName() != null && !contact.lastName().isBlank()) ? contact.lastName().trim() : "";
-        String comp = (contact.company() != null && !contact.company().isBlank()) ? contact.company().trim() : "Oxygen to Innovation";
+        String fName = (contact.firstName() != null && !contact.firstName().isBlank() && !contact.firstName().equals("—"))
+                ? contact.firstName().trim() : "Valued Partner";
+        String lName = (contact.lastName() != null && !contact.lastName().isBlank() && !contact.lastName().equals("—"))
+                ? contact.lastName().trim() : "";
+        String comp = (contact.company() != null && !contact.company().isBlank() && !contact.company().equals("—"))
+                ? contact.company().trim()
+                : (contact.parentOrganization() != null && !contact.parentOrganization().isBlank() && !contact.parentOrganization().equals("—")
+                        ? contact.parentOrganization().trim()
+                        : "Valued Organization");
         String em = (contact.email() != null && !contact.email().isBlank()) ? contact.email().trim() : "";
         String sName = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Oxygen to Innovation";
 
         String result = template;
-        result = result.replace("{{firstName}}", fName)
-                .replace("{{lastName}}", lName)
-                .replace("{{company}}", comp)
-                .replace("{{email}}", em)
-                .replace("{{senderName}}", sName);
+        result = result.replaceAll("(?i)\\{\\{firstName}}", fName)
+                .replaceAll("(?i)\\{\\{lastName}}", lName)
+                .replaceAll("(?i)\\{\\{company}}", comp)
+                .replaceAll("(?i)\\{\\{companyName}}", comp)
+                .replaceAll("(?i)\\{\\{organization}}", comp)
+                .replaceAll("(?i)\\{\\{org}}", comp)
+                .replaceAll("(?i)\\{\\{orgName}}", comp)
+                .replaceAll("(?i)\\{\\{parentOrganization}}", comp)
+                .replaceAll("(?i)\\{\\{email}}", em)
+                .replaceAll("(?i)\\{\\{senderName}}", sName);
         return result.replaceAll("\\{\\{[a-zA-Z0-9_]+}}", "").trim();
     }
 
