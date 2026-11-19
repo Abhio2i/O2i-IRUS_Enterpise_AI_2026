@@ -603,6 +603,13 @@ export const ContentStudioPage = () => {
             const status = await getCampaignStatus(result.campaignId);
             errCount = 0;
             setTrackingStatus(status);
+            setActiveCampaignResult(prev => prev ? {
+              ...prev,
+              status: status.status,
+              sent: status.sentCount,
+              failed: status.bouncedCount,
+              recipientCount: status.totalRecipients || prev.recipientCount,
+            } : prev);
             if (status.status !== 'SENDING') {
               clearInterval(intervalId);
               fetchCampaignsList();
@@ -621,6 +628,13 @@ export const ContentStudioPage = () => {
           try {
             const status = await getCampaignStatus(result.campaignId);
             setTrackingStatus(status);
+            setActiveCampaignResult(prev => prev ? {
+              ...prev,
+              status: status.status,
+              sent: status.sentCount,
+              failed: status.bouncedCount,
+              recipientCount: status.totalRecipients || prev.recipientCount,
+            } : prev);
           } catch {}
         }, 1000);
       }
@@ -1613,24 +1627,30 @@ export const ContentStudioPage = () => {
               {activeCampaignResult && (
                 <div style={{
                   padding: '12px 14px', borderRadius: 8,
-                  background: activeCampaignResult.status === 'FAILED' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
-                  border: `1px solid ${activeCampaignResult.status === 'FAILED' ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
-                  color: activeCampaignResult.status === 'FAILED' ? '#dc2626' : '#16a34a',
+                  background: (trackingStatus?.status || activeCampaignResult.status) === 'FAILED' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+                  border: `1px solid ${(trackingStatus?.status || activeCampaignResult.status) === 'FAILED' ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
+                  color: (trackingStatus?.status || activeCampaignResult.status) === 'FAILED' ? '#dc2626' : '#16a34a',
                   fontSize: 12
                 }}>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    {activeCampaignResult.status === 'FAILED' ? '✕ Campaign Failed' : '✓ Campaign Accepted'} — ID: {activeCampaignResult.campaignId || 'CMP-QUEUED'}
+                    {(trackingStatus?.status || activeCampaignResult.status) === 'FAILED'
+                      ? '✕ Campaign Failed'
+                      : ((trackingStatus?.status || activeCampaignResult.status) === 'COMPLETED'
+                        ? '✓ Campaign Completed'
+                        : '✓ Campaign Accepted')} — ID: {activeCampaignResult.campaignId || 'CMP-QUEUED'}
                   </div>
-                  <div>Recipients: {activeCampaignResult.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length)} contacts ({audienceType === 'DIRECT' ? directEmail : (audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List'))})</div>
+                  <div>Recipients: {trackingStatus?.totalRecipients || activeCampaignResult.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length)} contacts ({audienceType === 'DIRECT' ? directEmail : (audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List'))})</div>
                   {activeCampaignResult.cc && activeCampaignResult.cc.length > 0 && (
                     <div>Cc: <strong>{activeCampaignResult.cc.join(', ')}</strong></div>
                   )}
                   {activeCampaignResult.bcc && activeCampaignResult.bcc.length > 0 && (
                     <div>Bcc: <strong>{activeCampaignResult.bcc.join(', ')}</strong></div>
                   )}
-                  {activeCampaignResult.sent !== undefined && (
-                    <div>Sent: <strong>{activeCampaignResult.sent}</strong> · Failed: <strong>{activeCampaignResult.failed || 0}</strong></div>
-                  )}
+                  <div>
+                    Sent: <strong>{trackingStatus?.sentCount ?? activeCampaignResult.sent ?? 0}</strong>
+                    {' · '}
+                    Failed: <strong>{trackingStatus?.bouncedCount ?? activeCampaignResult.failed ?? 0}</strong>
+                  </div>
                   {activeCampaignResult.rateLimitPolicy && (
                     <div style={{ marginTop: 4, color: '#0284c7', fontSize: 11.5, fontWeight: 600 }}>
                       🛡️ {activeCampaignResult.rateLimitPolicy}
