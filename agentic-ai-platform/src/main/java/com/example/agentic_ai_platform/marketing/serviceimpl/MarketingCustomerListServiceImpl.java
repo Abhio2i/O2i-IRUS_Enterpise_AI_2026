@@ -366,8 +366,8 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
             throw new IllegalArgumentException("Invalid email: " + (email.isBlank() ? "empty" : email));
         }
 
-        // 1. Company / Organization
-        String company = firstNonBlank(record, indexes, "company", "companyname", "organizationsite", "organization", "parentorganization", "org", "businessname", "institution", "account");
+        // 1. Company / Organization / School Name
+        String company = firstNonBlank(record, indexes, "schoolname", "school", "company", "companyname", "organizationsite", "organization", "parentorganization", "org", "businessname", "institution", "account");
 
         // 2. Industry / Category / Type
         String industry = firstNonBlank(record, indexes, "industry", "category", "type", "sector", "vertical", "sitetype", "orgcategory");
@@ -402,7 +402,7 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
         String firstName = firstNonBlank(record, indexes, "firstname", "first", "fname");
         String lastName = firstNonBlank(record, indexes, "lastname", "last", "lname", "surname");
         if (firstName.isBlank() && lastName.isBlank()) {
-            String fullName = firstNonBlank(record, indexes, "name", "fullname", "contactname", "contactperson", "contact");
+            String fullName = firstNonBlank(record, indexes, "admissionscontact", "admissioncontact", "contactname", "contactperson", "name", "fullname", "contact");
             if (!fullName.isBlank()) {
                 String[] parts = fullName.trim().split("\\s+", 2);
                 firstName = parts[0];
