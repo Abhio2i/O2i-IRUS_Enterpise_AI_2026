@@ -420,17 +420,45 @@ public class MarketingCampaignController {
         ));
     }
 
+    private String extractDomainName(String email) {
+        if (email == null || !email.contains("@")) return "Team";
+        try {
+            String domainPart = email.substring(email.indexOf("@") + 1).trim();
+            int dotIdx = domainPart.indexOf(".");
+            String name = (dotIdx > 0) ? domainPart.substring(0, dotIdx) : domainPart;
+            if (name.isBlank() || name.equalsIgnoreCase("gmail") || name.equalsIgnoreCase("yahoo") || name.equalsIgnoreCase("hotmail") || name.equalsIgnoreCase("outlook")) {
+                return "Team";
+            }
+            return Character.toUpperCase(name.charAt(0)) + (name.length() > 1 ? name.substring(1) : "");
+        } catch (Exception e) {
+            return "Team";
+        }
+    }
+
     private String personalizeHtml(String template, MarketingContactResponse contact, String senderName) {
         if (template == null) return "";
-        String fName = (contact.firstName() != null && !contact.firstName().isBlank() && !contact.firstName().equals("—"))
-                ? contact.firstName().trim() : "Valued Partner";
-        String lName = (contact.lastName() != null && !contact.lastName().isBlank() && !contact.lastName().equals("—"))
-                ? contact.lastName().trim() : "";
-        String comp = (contact.company() != null && !contact.company().isBlank() && !contact.company().equals("—"))
+        String rawFirst = (contact.firstName() != null && !contact.firstName().isBlank() && !contact.firstName().equals("—")) ? contact.firstName().trim() : "";
+        String rawLast = (contact.lastName() != null && !contact.lastName().isBlank() && !contact.lastName().equals("—")) ? contact.lastName().trim() : "";
+        String fullName = (rawFirst + (!rawLast.isBlank() ? " " + rawLast : "")).trim();
+
+        String rawComp = (contact.company() != null && !contact.company().isBlank() && !contact.company().equals("—"))
                 ? contact.company().trim()
                 : (contact.parentOrganization() != null && !contact.parentOrganization().isBlank() && !contact.parentOrganization().equals("—")
                         ? contact.parentOrganization().trim()
-                        : "Valued Organization");
+                        : "");
+
+        // Smart auto-fallback: if company name is missing, automatically pick contact's personal name!
+        String comp;
+        if (!rawComp.isBlank()) {
+            comp = rawComp;
+        } else if (!fullName.isBlank()) {
+            comp = fullName;
+        } else {
+            comp = extractDomainName(contact.email());
+        }
+
+        String fName = !rawFirst.isBlank() ? rawFirst : (!rawComp.isBlank() ? rawComp : comp);
+        String lName = rawLast;
         String em = (contact.email() != null && !contact.email().isBlank()) ? contact.email().trim() : "";
         String sName = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Oxygen to Innovation";
 
@@ -450,15 +478,28 @@ public class MarketingCampaignController {
 
     private String personalizeSubject(String template, MarketingContactResponse contact, String senderName) {
         if (template == null) return "";
-        String fName = (contact.firstName() != null && !contact.firstName().isBlank() && !contact.firstName().equals("—"))
-                ? contact.firstName().trim() : "Valued Partner";
-        String lName = (contact.lastName() != null && !contact.lastName().isBlank() && !contact.lastName().equals("—"))
-                ? contact.lastName().trim() : "";
-        String comp = (contact.company() != null && !contact.company().isBlank() && !contact.company().equals("—"))
+        String rawFirst = (contact.firstName() != null && !contact.firstName().isBlank() && !contact.firstName().equals("—")) ? contact.firstName().trim() : "";
+        String rawLast = (contact.lastName() != null && !contact.lastName().isBlank() && !contact.lastName().equals("—")) ? contact.lastName().trim() : "";
+        String fullName = (rawFirst + (!rawLast.isBlank() ? " " + rawLast : "")).trim();
+
+        String rawComp = (contact.company() != null && !contact.company().isBlank() && !contact.company().equals("—"))
                 ? contact.company().trim()
                 : (contact.parentOrganization() != null && !contact.parentOrganization().isBlank() && !contact.parentOrganization().equals("—")
                         ? contact.parentOrganization().trim()
-                        : "Valued Organization");
+                        : "");
+
+        // Smart auto-fallback: if company name is missing, automatically pick contact's personal name!
+        String comp;
+        if (!rawComp.isBlank()) {
+            comp = rawComp;
+        } else if (!fullName.isBlank()) {
+            comp = fullName;
+        } else {
+            comp = extractDomainName(contact.email());
+        }
+
+        String fName = !rawFirst.isBlank() ? rawFirst : (!rawComp.isBlank() ? rawComp : comp);
+        String lName = rawLast;
         String em = (contact.email() != null && !contact.email().isBlank()) ? contact.email().trim() : "";
         String sName = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Oxygen to Innovation";
 

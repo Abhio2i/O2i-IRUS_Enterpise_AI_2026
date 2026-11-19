@@ -1543,22 +1543,34 @@ export const ContentStudioPage = () => {
 
                 const isSample = audienceType !== 'DIRECT' && matchedContacts.length === 0;
 
-                const compValue = (previewRecipient.company && previewRecipient.company !== '—')
-                  ? previewRecipient.company
+                const rawFirst = (previewRecipient.firstName && previewRecipient.firstName !== '—') ? previewRecipient.firstName.trim() : '';
+                const rawLast = (previewRecipient.lastName && previewRecipient.lastName !== '—') ? previewRecipient.lastName.trim() : '';
+                const fullName = (rawFirst + (rawLast ? ` ${rawLast}` : '')).trim();
+
+                const rawComp = (previewRecipient.company && previewRecipient.company !== '—')
+                  ? previewRecipient.company.trim()
                   : ((previewRecipient.parentOrganization && previewRecipient.parentOrganization !== '—')
-                      ? previewRecipient.parentOrganization
-                      : 'Oxygen to Innovation');
+                      ? previewRecipient.parentOrganization.trim()
+                      : '');
+
+                // Smart auto-fallback: if company name is missing, automatically pick contact's personal name!
+                let compValue = rawComp;
+                if (!compValue) {
+                  compValue = fullName || (previewRecipient.email?.includes('@') ? previewRecipient.email.split('@')[1].split('.')[0].toUpperCase() : 'Team');
+                }
+
+                const fNameValue = rawFirst || rawComp || compValue || 'Partner';
 
                 const renderedSubject = (emailSubject || '')
-                  .replace(/\{\{firstName\}\}/gi, previewRecipient.firstName || 'Partner')
-                  .replace(/\{\{lastName\}\}/gi, previewRecipient.lastName || '')
+                  .replace(/\{\{firstName\}\}/gi, fNameValue)
+                  .replace(/\{\{lastName\}\}/gi, rawLast)
                   .replace(/\{\{(company|organization|org|orgName|companyName|parentOrganization)\}\}/gi, compValue)
                   .replace(/\{\{email\}\}/gi, previewRecipient.email || 'client@example.com')
                   .replace(/\{\{senderName\}\}/gi, senderName || 'Oxygen to Innovation');
 
                 const renderedHtml = (emailBodyHtml || '')
-                  .replace(/\{\{firstName\}\}/gi, `<span style="background: rgba(99,102,241,0.15); padding: 1px 5px; border-radius: 4px; color: #4338ca; font-weight: 600;">${previewRecipient.firstName || 'Partner'}</span>`)
-                  .replace(/\{\{lastName\}\}/gi, previewRecipient.lastName ? `<span style="background: rgba(2,132,199,0.15); padding: 1px 5px; border-radius: 4px; color: #0284c7; font-weight: 600;">${previewRecipient.lastName}</span>` : '')
+                  .replace(/\{\{firstName\}\}/gi, `<span style="background: rgba(99,102,241,0.15); padding: 1px 5px; border-radius: 4px; color: #4338ca; font-weight: 600;">${fNameValue}</span>`)
+                  .replace(/\{\{lastName\}\}/gi, rawLast ? `<span style="background: rgba(2,132,199,0.15); padding: 1px 5px; border-radius: 4px; color: #0284c7; font-weight: 600;">${rawLast}</span>` : '')
                   .replace(/\{\{(company|organization|org|orgName|companyName|parentOrganization)\}\}/gi, `<span style="background: rgba(16,185,129,0.15); padding: 1px 5px; border-radius: 4px; color: #047857; font-weight: 600;">${compValue}</span>`)
                   .replace(/\{\{email\}\}/gi, `<span style="background: rgba(245,158,11,0.15); padding: 1px 5px; border-radius: 4px; color: #b45309; font-weight: 600;">${previewRecipient.email || 'client@example.com'}</span>`)
                   .replace(/\{\{senderName\}\}/gi, senderName || 'Oxygen to Innovation');
