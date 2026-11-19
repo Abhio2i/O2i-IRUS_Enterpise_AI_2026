@@ -301,6 +301,7 @@ public class MarketingCampaignController {
             int batchCount = 0;
             for (int i = 0; i < recipients.size(); i++) {
                 MarketingContactResponse contact = recipients.get(i);
+                boolean emailSent = false;
                 try {
                     String html = personalizeHtml(request.contentHtml(), contact, request.senderName());
                     String personalizedSubject = personalizeSubject(request.subject() == null ? "" : request.subject(), contact, request.senderName());
@@ -325,19 +326,43 @@ public class MarketingCampaignController {
                         helper.addAttachment(attachName, new ByteArrayResource(attachBytes), attachContentType);
                     }
 
-                    if (mailHost != null && !mailHost.isBlank()) {
-                        mailSender.send(message);
-                        log.info("Dispatched email ({}/{}) via SMTP to {}", i + 1, total, contact.email());
-                    } else {
-                        log.info("SMTP_HOST not set: simulated dispatch ({}/{}) to {}", i + 1, total, contact.email());
+                    for (int attempt = 1; attempt <= 2; attempt++) {
+                        try {
+                            if (mailHost != null && !mailHost.isBlank()) {
+                                mailSender.send(message);
+                                log.info("Dispatched email ({}/{}) via SMTP to {}", i + 1, total, contact.email());
+                            } else {
+                                log.info("SMTP_HOST not set: simulated dispatch ({}/{}) to {}", i + 1, total, contact.email());
+                            }
+                            sent++;
+                            emailSent = true;
+                            break;
+                        } catch (Exception ex) {
+                            if (attempt == 1) {
+                                log.warn("SMTP attempt 1 failed for {}, retrying in 2s... Reason: {}", contact.email(), ex.getMessage());
+                                try { Thread.sleep(2000L); } catch (InterruptedException ignored) {}
+                            } else {
+                                failed++;
+                                log.error("Failed to send email to {}: {}", contact.email(), ex.getMessage());
+                            }
+                        }
                     }
-                    sent++;
                 } catch (Exception ex) {
                     failed++;
-                    log.error("Failed to send email to {}: {}", contact.email(), ex.getMessage());
+                    log.error("Failed to prepare email for {}: {}", contact.email(), ex.getMessage());
                 }
 
                 batchCount++;
+
+                // Safe inter-email pacing (1.5s) to avoid GoDaddy socket resets
+                if (emailSent && (i + 1) < recipients.size() && batchCount < batchSize) {
+                    try {
+                        Thread.sleep(1500L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
 
                 // Real-time progress update
                 CampaignState progressState = new CampaignState(
@@ -404,20 +429,20 @@ public class MarketingCampaignController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found");
         }
 
-        return ResponseEntity.ok(Map.ofEntries(
-                Map.entry("campaignId", state.campaignId().toString()),
-                Map.entry("campaignName", state.campaignName()),
-                Map.entry("status", state.status()),
-                Map.entry("targetDomain", state.targetDomain()),
-                Map.entry("totalRecipients", state.totalRecipients()),
-                Map.entry("sentCount", state.sentCount()),
-                Map.entry("deliveredCount", state.deliveredCount()),
-                Map.entry("openedCount", 0),
-                Map.entry("clickedCount", 0),
-                Map.entry("bouncedCount", state.bouncedCount()),
-                Map.entry("dispatchedAt", state.dispatchedAt().toString()),
-                Map.entry("completedAt", state.completedAt().toString())
-        ));
+        Map<String, Object> map = new HashMap<>();
+        map.put("campaignId", state.campaignId().toString());
+        map.put("campaignName", state.campaignName());
+        map.put("status", state.status());
+        map.put("targetDomain", state.targetDomain());
+        map.put("totalRecipients", state.totalRecipients());
+        map.put("sentCount", state.sentCount());
+        map.put("deliveredCount", state.deliveredCount());
+        map.put("openedCount", 0);
+        map.put("clickedCount", 0);
+        map.put("bouncedCount", state.bouncedCount());
+        map.put("dispatchedAt", state.dispatchedAt() != null ? state.dispatchedAt().toString() : "");
+        map.put("completedAt", state.completedAt() != null ? state.completedAt().toString() : "");
+        return ResponseEntity.ok(map);
     }
 
     private String extractDomainName(String email) {

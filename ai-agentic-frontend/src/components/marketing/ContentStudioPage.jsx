@@ -597,17 +597,23 @@ export const ContentStudioPage = () => {
 
       // Poll campaign status actively while SENDING
       if (result.campaignId && result.status === 'SENDING') {
+        let errCount = 0;
         const intervalId = setInterval(async () => {
           try {
             const status = await getCampaignStatus(result.campaignId);
+            errCount = 0;
             setTrackingStatus(status);
             if (status.status !== 'SENDING') {
               clearInterval(intervalId);
               fetchCampaignsList();
-              showFeedback(`Campaign completed! ${status.sentCount || 0} / ${status.totalRecipients || 0} emails delivered safely with GoDaddy rate pacing.`, 'success');
+              const msg = status.status === 'COMPLETED'
+                ? `Campaign completed! ${status.sentCount || 0} / ${status.totalRecipients || 0} emails delivered safely with GoDaddy rate pacing.`
+                : `Campaign finished with status: ${status.status} (${status.sentCount || 0} sent, ${status.bouncedCount || 0} failed).`;
+              showFeedback(msg, status.status === 'COMPLETED' ? 'success' : 'error');
             }
           } catch {
-            clearInterval(intervalId);
+            errCount++;
+            if (errCount > 5) clearInterval(intervalId);
           }
         }, 2000);
       } else if (result.campaignId) {
