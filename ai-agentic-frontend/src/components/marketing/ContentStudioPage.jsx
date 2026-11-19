@@ -1675,19 +1675,48 @@ export const ContentStudioPage = () => {
                 const rawLast = (previewRecipient.lastName && previewRecipient.lastName !== '—') ? previewRecipient.lastName.trim() : '';
                 const fullName = (rawFirst + (rawLast ? ` ${rawLast}` : '')).trim();
 
+                const isGenericName = (name) => {
+                  if (!name) return true;
+                  const n = name.trim().toLowerCase();
+                  return ['mail', 'contact', 'mail contact', 'primary', 'primary contact', 'admission', 'admission contact', 'admissions', 'admissions contact', 'info', 'info contact', 'admin', 'admin contact', 'office', 'general'].includes(n);
+                };
+
+                const deriveOrgName = (email, website) => {
+                  let d = (website || (email?.includes('@') ? email.split('@')[1] : '') || '').toLowerCase().trim();
+                  d = d.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+                  d = d.replace(/\.(com|ca|org|net|edu|on\.ca|qc\.ca|bc\.ca|ab\.ca)$/i, '');
+                  if (!d) return 'Team';
+                  for (const suffix of ['school', 'academy', 'college', 'montessori', 'institute', 'grammar']) {
+                    if (d.endsWith(suffix) && d.length > suffix.length) {
+                      const base = d.slice(0, -suffix.length);
+                      return `${base.charAt(0).toUpperCase() + base.slice(1)} ${suffix.charAt(0).toUpperCase() + suffix.slice(1)}`;
+                    }
+                  }
+                  return d.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                };
+
                 const rawComp = (previewRecipient.company && previewRecipient.company !== '—')
                   ? previewRecipient.company.trim()
                   : ((previewRecipient.parentOrganization && previewRecipient.parentOrganization !== '—')
                       ? previewRecipient.parentOrganization.trim()
                       : '');
 
-                // Smart auto-fallback: if company name is missing, automatically pick contact's personal name!
+                // Smart auto-fallback: if company name is missing, use contact's personal name only if real, else clean domain name!
                 let compValue = rawComp;
                 if (!compValue) {
-                  compValue = fullName || (previewRecipient.email?.includes('@') ? previewRecipient.email.split('@')[1].split('.')[0].toUpperCase() : 'Team');
+                  if (fullName && !isGenericName(fullName)) {
+                    compValue = fullName;
+                  } else {
+                    compValue = deriveOrgName(previewRecipient.email, previewRecipient.website);
+                  }
                 }
 
-                const fNameValue = rawFirst || rawComp || compValue || 'Partner';
+                const fNameValue = (rawFirst && !isGenericName(rawFirst)) ? rawFirst : (compValue || 'Partner');
+
+                const displayCompany = previewRecipient.company || compValue;
+                const displayName = (previewRecipient.firstName && !isGenericName(previewRecipient.firstName))
+                  ? `${previewRecipient.firstName} ${previewRecipient.lastName || ''}`.trim()
+                  : (displayCompany ? `${displayCompany} Team` : 'Contact');
 
                 const renderedSubject = (emailSubject || '')
                   .replace(/\{\{firstName\}\}/gi, fNameValue)
@@ -1711,23 +1740,13 @@ export const ContentStudioPage = () => {
                       </div>
                       <div style={{ fontSize: 11, color: isSample ? '#f59e0b' : 'var(--brand-primary, #2563eb)' }}>
                         {isSample ? '⚡ Sample Preview: ' : '✓ Preview Recipient: '}
-                        <strong>{previewRecipient.email}</strong> ({previewRecipient.firstName} {previewRecipient.lastName || ''} @ {previewRecipient.company})
+                        <strong>{previewRecipient.email}</strong> ({displayName}{displayCompany ? ` @ ${displayCompany}` : ''})
                       </div>
                     </div>
                     {(ccEmails.trim() || bccEmails.trim()) && (
                       <div style={{ display: 'flex', gap: 12, fontSize: 11, marginBottom: 8, paddingBottom: 6, borderBottom: '1px dashed var(--border-subtle)', color: 'var(--text-muted)' }}>
                         {ccEmails.trim() && <div><strong style={{ color: '#2563eb' }}>Cc:</strong> {ccEmails.trim()}</div>}
                         {bccEmails.trim() && <div><strong style={{ color: '#059669' }}>Bcc:</strong> {bccEmails.trim()}</div>}
-                      </div>
-                    )}
-                    {attachmentFiles && attachmentFiles.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, fontSize: 11, marginBottom: 8, paddingBottom: 6, borderBottom: '1px dashed var(--border-subtle)', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ color: '#2563eb', fontWeight: 600 }}>📎 Attachments ({attachmentFiles.length}):</span>
-                        {attachmentFiles.map((f, i) => (
-                          <span key={i} style={{ background: 'var(--bg-elevated)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border-default)' }}>
-                            {f.name}
-                          </span>
-                        ))}
                       </div>
                     )}
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border-subtle)' }}>
@@ -1799,9 +1818,6 @@ export const ContentStudioPage = () => {
                       )}
                       {activeCampaignResult.bcc && activeCampaignResult.bcc.length > 0 && (
                         <div>Bcc: <strong>{activeCampaignResult.bcc.join(', ')}</strong></div>
-                      )}
-                      {activeCampaignResult.attachments && activeCampaignResult.attachments.length > 0 && (
-                        <div>📎 Attachments: <strong>{activeCampaignResult.attachments.join(', ')}</strong></div>
                       )}
                       <div>
                         Sent: <strong>{trackingStatus?.sentCount ?? activeCampaignResult.sent ?? 0}</strong>

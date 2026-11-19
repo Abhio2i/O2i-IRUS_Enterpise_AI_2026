@@ -552,14 +552,29 @@ public class MarketingCampaignController {
         return ResponseEntity.ok(resp);
     }
 
+    private boolean isGenericName(String name) {
+        if (name == null || name.isBlank()) return true;
+        String n = name.trim().toLowerCase();
+        return n.equals("mail") || n.equals("contact") || n.equals("mail contact") || n.equals("primary")
+                || n.equals("primary contact") || n.equals("admission") || n.equals("admission contact")
+                || n.equals("admissions") || n.equals("admissions contact") || n.equals("info") || n.equals("info contact")
+                || n.equals("admin") || n.equals("admin contact") || n.equals("office") || n.equals("general");
+    }
+
     private String extractDomainName(String email) {
         if (email == null || !email.contains("@")) return "Team";
         try {
-            String domainPart = email.substring(email.indexOf("@") + 1).trim();
+            String domainPart = email.substring(email.indexOf("@") + 1).trim().toLowerCase();
             int dotIdx = domainPart.indexOf(".");
             String name = (dotIdx > 0) ? domainPart.substring(0, dotIdx) : domainPart;
-            if (name.isBlank() || name.equalsIgnoreCase("gmail") || name.equalsIgnoreCase("yahoo") || name.equalsIgnoreCase("hotmail") || name.equalsIgnoreCase("outlook")) {
+            if (name.isBlank() || name.equals("gmail") || name.equals("yahoo") || name.equals("hotmail") || name.equals("outlook")) {
                 return "Team";
+            }
+            for (String suffix : List.of("school", "academy", "college", "montessori", "institute")) {
+                if (name.endsWith(suffix) && name.length() > suffix.length()) {
+                    String base = name.substring(0, name.length() - suffix.length());
+                    return Character.toUpperCase(base.charAt(0)) + base.substring(1) + " " + Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1);
+                }
             }
             return Character.toUpperCase(name.charAt(0)) + (name.length() > 1 ? name.substring(1) : "");
         } catch (Exception e) {
@@ -579,17 +594,17 @@ public class MarketingCampaignController {
                         ? contact.parentOrganization().trim()
                         : "");
 
-        // Smart auto-fallback: if company name is missing, automatically pick contact's personal name!
+        // Smart auto-fallback: if company name is missing, use contact's personal name only if real, else domain name!
         String comp;
         if (!rawComp.isBlank()) {
             comp = rawComp;
-        } else if (!fullName.isBlank()) {
+        } else if (!fullName.isBlank() && !isGenericName(fullName)) {
             comp = fullName;
         } else {
             comp = extractDomainName(contact.email());
         }
 
-        String fName = !rawFirst.isBlank() ? rawFirst : (!rawComp.isBlank() ? rawComp : comp);
+        String fName = (!rawFirst.isBlank() && !isGenericName(rawFirst)) ? rawFirst : (!rawComp.isBlank() ? rawComp : comp);
         String lName = rawLast;
         String em = (contact.email() != null && !contact.email().isBlank()) ? contact.email().trim() : "";
         String sName = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Oxygen to Innovation";
@@ -622,17 +637,17 @@ public class MarketingCampaignController {
                         ? contact.parentOrganization().trim()
                         : "");
 
-        // Smart auto-fallback: if company name is missing, automatically pick contact's personal name!
+        // Smart auto-fallback: if company name is missing, use contact's personal name only if real, else domain name!
         String comp;
         if (!rawComp.isBlank()) {
             comp = rawComp;
-        } else if (!fullName.isBlank()) {
+        } else if (!fullName.isBlank() && !isGenericName(fullName)) {
             comp = fullName;
         } else {
             comp = extractDomainName(contact.email());
         }
 
-        String fName = !rawFirst.isBlank() ? rawFirst : (!rawComp.isBlank() ? rawComp : comp);
+        String fName = (!rawFirst.isBlank() && !isGenericName(rawFirst)) ? rawFirst : (!rawComp.isBlank() ? rawComp : comp);
         String lName = rawLast;
         String em = (contact.email() != null && !contact.email().isBlank()) ? contact.email().trim() : "";
         String sName = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Oxygen to Innovation";
