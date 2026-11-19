@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +52,7 @@ public class MarketingCampaignController {
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     private final Map<UUID, CampaignState> campaigns = new ConcurrentHashMap<>();
+    private final Map<UUID, Future<?>> runningTasks = new ConcurrentHashMap<>();
 
     public record SendBulkRequest(
             String campaignName,
@@ -295,11 +297,21 @@ public class MarketingCampaignController {
         );
         campaigns.put(campaignId, initialState);
 
-        executorService.submit(() -> {
+        Future<?> taskFuture = executorService.submit(() -> {
             int sent = 0;
             int failed = 0;
             int batchCount = 0;
             for (int i = 0; i < recipients.size(); i++) {
+                CampaignState checkCancel = campaigns.get(campaignId);
+                if (checkCancel != null && "CANCELLED".equals(checkCancel.status())) {
+                    log.info("Campaign {} was CANCELLED by user. Halting dispatch loop at {}/{}", campaignId, sent, total);
+                    break;
+                }
+                if (Thread.currentThread().isInterrupted()) {
+                    log.info("Campaign {} worker thread was interrupted. Halting dispatch.", campaignId);
+                    break;
+                }
+
                 MarketingContactResponse contact = recipients.get(i);
                 boolean emailSent = false;
                 try {
@@ -327,6 +339,10 @@ public class MarketingCampaignController {
                     }
 
                     for (int attempt = 1; attempt <= 2; attempt++) {
+                        CampaignState beforeSendCheck = campaigns.get(campaignId);
+                        if (beforeSendCheck != null && "CANCELLED".equals(beforeSendCheck.status())) {
+                            break;
+                        }
                         try {
                             if (mailHost != null && !mailHost.isBlank()) {
                                 mailSender.send(message);
@@ -352,6 +368,12 @@ public class MarketingCampaignController {
                     log.error("Failed to prepare email for {}: {}", contact.email(), ex.getMessage());
                 }
 
+                CampaignState checkAfterSend = campaigns.get(campaignId);
+                if (checkAfterSend != null && "CANCELLED".equals(checkAfterSend.status())) {
+                    log.info("Campaign {} was CANCELLED by user after contact {}. Stopping.", campaignId, contact.email());
+                    break;
+                }
+
                 batchCount++;
 
                 // Safe inter-email pacing (1.5s) to avoid GoDaddy socket resets
@@ -360,8 +382,15 @@ public class MarketingCampaignController {
                         Thread.sleep(1500L);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
+                        log.info("Campaign {} pacing sleep interrupted", campaignId);
                         break;
                     }
+                }
+
+                // Check again if cancelled during pacing sleep
+                CampaignState checkAfterPacing = campaigns.get(campaignId);
+                if (checkAfterPacing != null && "CANCELLED".equals(checkAfterPacing.status())) {
+                    break;
                 }
 
                 // Real-time progress update
@@ -379,17 +408,32 @@ public class MarketingCampaignController {
                     log.info("GoDaddy rate pacing triggered: {} emails sent in current minute. Cooling down for {} seconds before next batch...",
                             batchCount, pauseSeconds);
                     try {
-                        Thread.sleep(pauseSeconds * 1000L);
+                        for (int s = 0; s < pauseSeconds; s++) {
+                            CampaignState chk = campaigns.get(campaignId);
+                            if (chk != null && "CANCELLED".equals(chk.status())) {
+                                break;
+                            }
+                            Thread.sleep(1000L);
+                        }
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.warn("Campaign {} email dispatch interrupted during cooldown", campaignId);
+                        break;
+                    }
+                    CampaignState chk = campaigns.get(campaignId);
+                    if (chk != null && "CANCELLED".equals(chk.status())) {
                         break;
                     }
                     batchCount = 0; // reset for next batch
                 }
             }
 
-            String finalStatus = (sent == total && total > 0) ? "COMPLETED" : (sent > 0 ? "PARTIAL" : "FAILED");
+            CampaignState finalCheck = campaigns.get(campaignId);
+            boolean wasCancelled = finalCheck != null && "CANCELLED".equals(finalCheck.status());
+            String finalStatus = wasCancelled
+                    ? "CANCELLED"
+                    : ((sent == total && total > 0) ? "COMPLETED" : (sent > 0 ? "PARTIAL" : "FAILED"));
+
             CampaignState finalState = new CampaignState(
                     campaignId, tenant,
                     request.campaignName() != null ? request.campaignName() : "Target Outreach",
@@ -398,9 +442,12 @@ public class MarketingCampaignController {
                     finalStatus, total, sent, sent, 0, 0, failed, now, Instant.now()
             );
             campaigns.put(campaignId, finalState);
+            runningTasks.remove(campaignId);
             log.info("Campaign {} finished dispatching. Status: {}, Total: {}, Sent: {}, Failed: {}",
                     campaignId, finalStatus, total, sent, failed);
         });
+
+        runningTasks.put(campaignId, taskFuture);
 
         Map<String, Object> responseMap = new HashMap<>();
         responseMap.put("campaignId", campaignId.toString());
@@ -443,6 +490,44 @@ public class MarketingCampaignController {
         map.put("dispatchedAt", state.dispatchedAt() != null ? state.dispatchedAt().toString() : "");
         map.put("completedAt", state.completedAt() != null ? state.completedAt().toString() : "");
         return ResponseEntity.ok(map);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<?> cancelCampaign(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        CampaignState state = campaigns.get(id);
+        if (state == null || !state.tenantId().equals(tenantId(auth))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found");
+        }
+        if (!"SENDING".equals(state.status())) {
+            return ResponseEntity.ok(Map.of(
+                    "message", "Campaign is not currently running (status: " + state.status() + ")",
+                    "status", state.status(),
+                    "sentCount", state.sentCount()
+            ));
+        }
+
+        CampaignState cancelledState = new CampaignState(
+                state.campaignId(), state.tenantId(),
+                state.campaignName(), state.targetDomain(), state.subject(),
+                "CANCELLED", state.totalRecipients(), state.sentCount(),
+                state.deliveredCount(), state.openedCount(), state.clickedCount(),
+                state.bouncedCount(), state.dispatchedAt(), Instant.now()
+        );
+        campaigns.put(id, cancelledState);
+
+        Future<?> future = runningTasks.remove(id);
+        if (future != null) {
+            future.cancel(true);
+        }
+
+        log.info("Campaign {} cancelled by user. Stopped at {}/{} sent.", id, state.sentCount(), state.totalRecipients());
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("message", "Campaign cancelled successfully. Further email sending stopped.");
+        resp.put("status", "CANCELLED");
+        resp.put("campaignId", id.toString());
+        resp.put("sentCount", state.sentCount());
+        resp.put("totalRecipients", state.totalRecipients());
+        return ResponseEntity.ok(resp);
     }
 
     private String extractDomainName(String email) {

@@ -5,13 +5,14 @@ import { addAuditLog } from '../../store/governanceSlice';
 import {
   Mail, CheckCircle, ShieldCheck, Send, Eye,
   Globe, RefreshCw, AlertCircle, FileText, Trash2, ArrowRight, Sparkles, Server, Users, Zap,
-  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser
+  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser, XCircle
 } from 'lucide-react';
 import {
   getContactsByDomain,
   generateAiEmailDraft,
   sendBulkCampaign,
   getCampaignStatus,
+  cancelCampaign,
   listEmailTemplates,
   createEmailTemplate,
   deleteEmailTemplate,
@@ -115,6 +116,7 @@ export const ContentStudioPage = () => {
 
   // Dispatch / Sending state
   const [isSending, setIsSending] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [activeCampaignResult, setActiveCampaignResult] = useState(null);
   const [trackingStatus, setTrackingStatus] = useState(null);
 
@@ -642,6 +644,27 @@ export const ContentStudioPage = () => {
       showFeedback(`Campaign dispatch failed: ${err.message}`, 'error');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Handle Cancel Campaign
+  const handleCancelCampaign = async (campaignIdToCancel) => {
+    const cid = campaignIdToCancel || activeCampaignResult?.campaignId;
+    if (!cid) return;
+    if (!window.confirm('Are you sure you want to stop/cancel sending this campaign? Any pending emails will be aborted.')) {
+      return;
+    }
+    setIsCancelling(true);
+    try {
+      const res = await cancelCampaign(cid);
+      showFeedback(res.message || 'Campaign cancelled successfully. Further email sending stopped.', 'info');
+      setTrackingStatus(prev => prev ? { ...prev, status: 'CANCELLED' } : { status: 'CANCELLED' });
+      setActiveCampaignResult(prev => prev ? { ...prev, status: 'CANCELLED' } : { status: 'CANCELLED' });
+      fetchCampaignsList();
+    } catch (err) {
+      showFeedback(`Failed to cancel campaign: ${err.message}`, 'error');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -1625,75 +1648,113 @@ export const ContentStudioPage = () => {
 
               {/* Active Campaign Result */}
               {activeCampaignResult && (
-                <div style={{
-                  padding: '12px 14px', borderRadius: 8,
-                  background: (trackingStatus?.status || activeCampaignResult.status) === 'FAILED' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
-                  border: `1px solid ${(trackingStatus?.status || activeCampaignResult.status) === 'FAILED' ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
-                  color: (trackingStatus?.status || activeCampaignResult.status) === 'FAILED' ? '#dc2626' : '#16a34a',
-                  fontSize: 12
-                }}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    {(trackingStatus?.status || activeCampaignResult.status) === 'FAILED'
-                      ? '✕ Campaign Failed'
-                      : ((trackingStatus?.status || activeCampaignResult.status) === 'COMPLETED'
-                        ? '✓ Campaign Completed'
-                        : '✓ Campaign Accepted')} — ID: {activeCampaignResult.campaignId || 'CMP-QUEUED'}
-                  </div>
-                  <div>Recipients: {trackingStatus?.totalRecipients || activeCampaignResult.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length)} contacts ({audienceType === 'DIRECT' ? directEmail : (audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List'))})</div>
-                  {activeCampaignResult.cc && activeCampaignResult.cc.length > 0 && (
-                    <div>Cc: <strong>{activeCampaignResult.cc.join(', ')}</strong></div>
-                  )}
-                  {activeCampaignResult.bcc && activeCampaignResult.bcc.length > 0 && (
-                    <div>Bcc: <strong>{activeCampaignResult.bcc.join(', ')}</strong></div>
-                  )}
-                  <div>
-                    Sent: <strong>{trackingStatus?.sentCount ?? activeCampaignResult.sent ?? 0}</strong>
-                    {' · '}
-                    Failed: <strong>{trackingStatus?.bouncedCount ?? activeCampaignResult.failed ?? 0}</strong>
-                  </div>
-                  {activeCampaignResult.rateLimitPolicy && (
-                    <div style={{ marginTop: 4, color: '#0284c7', fontSize: 11.5, fontWeight: 600 }}>
-                      🛡️ {activeCampaignResult.rateLimitPolicy}
-                    </div>
-                  )}
-                  {activeCampaignResult.note && (
-                    <div style={{ marginTop: 4, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                      ℹ {activeCampaignResult.note}
-                    </div>
-                  )}
-                  {activeCampaignResult.errorDetail && (
-                    <div style={{ marginTop: 4, color: '#dc2626', fontWeight: 600 }}>
-                      ⚠ Error: {activeCampaignResult.errorDetail}
-                    </div>
-                  )}
-                  {trackingStatus && (
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 12 }}>
-                        <span>
-                          Status: <strong style={{ color: trackingStatus.status === 'COMPLETED' ? '#16a34a' : (trackingStatus.status === 'SENDING' ? '#2563eb' : '#dc2626') }}>{trackingStatus.status}</strong>
-                          {trackingStatus.status === 'SENDING' && (
-                            <span style={{ marginLeft: 8, fontSize: 11, color: '#0284c7' }}>
-                              {(trackingStatus.sentCount > 0 && trackingStatus.sentCount % 25 === 0 && trackingStatus.sentCount < (trackingStatus.totalRecipients || 1))
-                                ? '⏸ Cooldown active (60s wait for GoDaddy rate limit)'
-                                : '🚀 Sending batch (25/min safe mode)...'}
+                (() => {
+                  const effectiveStatus = trackingStatus?.status || activeCampaignResult.status;
+                  const isFailed = effectiveStatus === 'FAILED';
+                  const isCancelled = effectiveStatus === 'CANCELLED';
+                  const isCompleted = effectiveStatus === 'COMPLETED';
+                  const isSendingLoop = effectiveStatus === 'SENDING';
+
+                  return (
+                    <div style={{
+                      padding: '12px 14px', borderRadius: 8,
+                      background: isFailed ? 'rgba(239,68,68,0.08)' : (isCancelled ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)'),
+                      border: `1px solid ${isFailed ? 'rgba(239,68,68,0.25)' : (isCancelled ? 'rgba(245,158,11,0.25)' : 'rgba(34,197,94,0.25)')}`,
+                      color: isFailed ? '#dc2626' : (isCancelled ? '#b45309' : '#16a34a'),
+                      fontSize: 12
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ fontWeight: 700 }}>
+                          {isFailed
+                            ? '✕ Campaign Failed'
+                            : (isCancelled
+                              ? '⏹ Campaign Stopped / Cancelled'
+                              : (isCompleted
+                                ? '✓ Campaign Completed'
+                                : '✓ Campaign Accepted (Sending...)'))} — ID: {activeCampaignResult.campaignId || 'CMP-QUEUED'}
+                        </div>
+                        {isSendingLoop && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelCampaign(activeCampaignResult.campaignId)}
+                            disabled={isCancelling}
+                            className="btn btn-sm"
+                            style={{
+                              background: '#dc2626',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '5px 12px',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              boxShadow: '0 1px 3px rgba(220,38,38,0.3)'
+                            }}
+                          >
+                            <XCircle size={14} /> {isCancelling ? 'Stopping...' : 'Stop / Cancel Sending'}
+                          </button>
+                        )}
+                      </div>
+                      <div>Recipients: {trackingStatus?.totalRecipients || activeCampaignResult.recipientCount || (audienceType === 'DIRECT' ? 1 : matchedContacts.length)} contacts ({audienceType === 'DIRECT' ? directEmail : (audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List'))})</div>
+                      {activeCampaignResult.cc && activeCampaignResult.cc.length > 0 && (
+                        <div>Cc: <strong>{activeCampaignResult.cc.join(', ')}</strong></div>
+                      )}
+                      {activeCampaignResult.bcc && activeCampaignResult.bcc.length > 0 && (
+                        <div>Bcc: <strong>{activeCampaignResult.bcc.join(', ')}</strong></div>
+                      )}
+                      <div>
+                        Sent: <strong>{trackingStatus?.sentCount ?? activeCampaignResult.sent ?? 0}</strong>
+                        {' · '}
+                        Failed: <strong>{trackingStatus?.bouncedCount ?? activeCampaignResult.failed ?? 0}</strong>
+                      </div>
+                      {activeCampaignResult.rateLimitPolicy && (
+                        <div style={{ marginTop: 4, color: '#0284c7', fontSize: 11.5, fontWeight: 600 }}>
+                          🛡️ {activeCampaignResult.rateLimitPolicy}
+                        </div>
+                      )}
+                      {activeCampaignResult.note && (
+                        <div style={{ marginTop: 4, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          ℹ {activeCampaignResult.note}
+                        </div>
+                      )}
+                      {activeCampaignResult.errorDetail && (
+                        <div style={{ marginTop: 4, color: '#dc2626', fontWeight: 600 }}>
+                          ⚠ Error: {activeCampaignResult.errorDetail}
+                        </div>
+                      )}
+                      {trackingStatus && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 12 }}>
+                            <span>
+                              Status: <strong style={{ color: isCompleted ? '#16a34a' : (isCancelled ? '#b45309' : (isSendingLoop ? '#2563eb' : '#dc2626')) }}>{trackingStatus.status}</strong>
+                              {isSendingLoop && (
+                                <span style={{ marginLeft: 8, fontSize: 11, color: '#0284c7' }}>
+                                  {(trackingStatus.sentCount > 0 && trackingStatus.sentCount % 25 === 0 && trackingStatus.sentCount < (trackingStatus.totalRecipients || 1))
+                                    ? '⏸ Cooldown active (60s wait for GoDaddy rate limit)'
+                                    : '🚀 Sending batch (25/min safe mode)...'}
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </span>
-                        <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>
-                          {trackingStatus.sentCount ?? 0} / {trackingStatus.totalRecipients ?? activeCampaignResult.totalQueued ?? 1} Sent
-                        </span>
-                      </div>
-                      <div style={{ height: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${Math.min(100, Math.round(((trackingStatus.sentCount ?? 0) / (trackingStatus.totalRecipients || 1)) * 100))}%`,
-                          background: trackingStatus.status === 'COMPLETED' ? '#22c55e' : '#2563eb',
-                          transition: 'width 0.4s ease'
-                        }} />
-                      </div>
+                            <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                              {trackingStatus.sentCount ?? 0} / {trackingStatus.totalRecipients ?? activeCampaignResult.totalQueued ?? 1} Sent
+                            </span>
+                          </div>
+                          <div style={{ height: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${Math.min(100, Math.round(((trackingStatus.sentCount ?? 0) / (trackingStatus.totalRecipients || 1)) * 100))}%`,
+                              background: isCompleted ? '#22c55e' : (isCancelled ? '#f59e0b' : '#2563eb'),
+                              transition: 'width 0.4s ease'
+                            }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()
               )}
 
               {/* GoDaddy Rate Pacing Info Pill */}
@@ -1717,14 +1778,40 @@ export const ContentStudioPage = () => {
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   Target: <strong>{audienceType === 'DIRECT' ? (directEmail || 'Direct Recipient') : `${matchedContacts.length} recipients`}</strong> {audienceType === 'DIRECT' ? '' : `(${audienceType === 'DOMAIN' ? `@${targetDomain}` : (savedLists.find(l => l.id === selectedListId)?.name || 'Saved List')})`}
                 </div>
-                <button
-                  type="submit"
-                  className="btn btn-solid"
-                  style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px' }}
-                  disabled={isSending || (audienceType === 'DIRECT' ? !directEmail : matchedContacts.length === 0)}
-                >
-                  <Send size={13} /> {isSending ? 'Dispatching...' : (syncedProposal ? `⚡ Send Proposal to ${directFirstName || directEmail}` : (audienceType === 'DIRECT' ? '⚡ Send Single Test Email' : `Send Bulk Email (${matchedContacts.length})`))}
-                </button>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  {(trackingStatus?.status || activeCampaignResult?.status) === 'SENDING' && (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelCampaign(activeCampaignResult?.campaignId)}
+                      disabled={isCancelling}
+                      className="btn"
+                      style={{
+                        background: '#dc2626',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '9px 18px',
+                        fontWeight: 600,
+                        fontSize: 12.5,
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        border: 'none',
+                        boxShadow: '0 1px 3px rgba(220,38,38,0.3)'
+                      }}
+                    >
+                      <XCircle size={14} /> {isCancelling ? 'Stopping...' : 'Stop / Cancel Sending'}
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="btn btn-solid"
+                    style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px' }}
+                    disabled={isSending || (trackingStatus?.status || activeCampaignResult?.status) === 'SENDING' || (audienceType === 'DIRECT' ? !directEmail : matchedContacts.length === 0)}
+                  >
+                    <Send size={13} /> {isSending ? 'Dispatching...' : (syncedProposal ? `⚡ Send Proposal to ${directFirstName || directEmail}` : (audienceType === 'DIRECT' ? '⚡ Send Single Test Email' : `Send Bulk Email (${matchedContacts.length})`))}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1760,9 +1847,22 @@ export const ContentStudioPage = () => {
                       <span className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         {camp.id || camp.campaignId}
                       </span>
-                      <span className={`pill-badge ${camp.status === 'COMPLETED' || camp.status === 'DEPLOYED' || camp.status === 'APPROVED' ? 'success' : (camp.status === 'FAILED' ? 'danger' : 'neutral')}`}>
-                        {camp.status}
-                      </span>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span className={`pill-badge ${camp.status === 'COMPLETED' || camp.status === 'DEPLOYED' || camp.status === 'APPROVED' ? 'success' : (camp.status === 'FAILED' ? 'danger' : (camp.status === 'CANCELLED' ? 'warning' : 'neutral'))}`}>
+                          {camp.status}
+                        </span>
+                        {camp.status === 'SENDING' && (
+                          <button
+                            type="button"
+                            className="btn btn-xs"
+                            style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => handleCancelCampaign(camp.id || camp.campaignId)}
+                            disabled={isCancelling}
+                          >
+                            <XCircle size={11} /> Cancel
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <h4 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 6px' }}>{camp.title || camp.campaignName}</h4>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>

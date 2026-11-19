@@ -1549,6 +1549,42 @@ export async function getCampaignStatus(campaignId) {
 }
 
 /**
+ * Cancel an active running campaign
+ * POST /api/marketing/campaigns/{id}/cancel
+ * Header: Authorization: Bearer <accessToken>
+ * Status: 200 OK
+ */
+export async function cancelCampaign(campaignId) {
+  if (!campaignId) throw new Error('campaignId is required');
+
+  let headers = getAuthHeaders({ 'Accept': 'application/json' });
+  let res = await fetch(`${BACKEND_URL}/api/marketing/campaigns/${encodeURIComponent(campaignId)}/cancel`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        headers = getAuthHeaders({ 'Accept': 'application/json' });
+        res = await fetch(`${BACKEND_URL}/api/marketing/campaigns/${encodeURIComponent(campaignId)}/cancel`, {
+          method: 'POST',
+          headers,
+        });
+      }
+    } catch {}
+  }
+
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to cancel campaign');
+    throw new Error(err);
+  }
+
+  return res.json();
+}
+
+/**
  * List Dispatched Campaigns from Backend
  * GET /api/marketing/campaigns
  * Header: Authorization: Bearer <accessToken>
