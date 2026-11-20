@@ -151,10 +151,14 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
         }
 
         List<ContactImportResponse.RowError> errors = new ArrayList<>();
-        List<MarketingContact> importedContacts = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        Set<String> existing = new HashSet<>();
-        contacts.findAllByTenantIdOrderByCreatedAtDesc(tenantId).forEach(contact -> existing.add(contact.getEmail()));
+        List<MarketingContact> newContactsToSave = new ArrayList<>();
+        List<MarketingContact> listMembers = new ArrayList<>();
+        Set<String> seenInCsv = new HashSet<>();
+
+        Map<String, MarketingContact> existingByEmail = new HashMap<>();
+        contacts.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+                .forEach(c -> existingByEmail.put(c.getEmail().toLowerCase(Locale.ROOT), c));
+
         int duplicates = 0;
         int invalid = 0;
         int processed = 0;
@@ -197,11 +201,35 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
                 }
                 try {
                     MarketingContact contact = contactFromRecord(tenantId, record, headerIndexes);
-                    String email = contact.getEmail();
-                    if (existing.contains(email) || !seen.add(email)) {
+                    String email = contact.getEmail().toLowerCase(Locale.ROOT);
+                    if (!seenInCsv.add(email)) {
                         duplicates++;
+                        continue;
+                    }
+
+                    if (existingByEmail.containsKey(email)) {
+                        duplicates++;
+                        MarketingContact existing = existingByEmail.get(email);
+                        boolean updated = false;
+                        if ((existing.getCompany() == null || existing.getCompany().isBlank() || isGenericName(existing.getCompany()))
+                                && contact.getCompany() != null && !contact.getCompany().isBlank() && !isGenericName(contact.getCompany())) {
+                            existing.setCompany(contact.getCompany());
+                            updated = true;
+                        }
+                        if ((existing.getFirstName() == null || existing.getFirstName().isBlank() || isGenericName(existing.getFirstName()))
+                                && contact.getFirstName() != null && !contact.getFirstName().isBlank() && !isGenericName(contact.getFirstName())) {
+                            existing.setFirstName(contact.getFirstName());
+                            existing.setLastName(contact.getLastName());
+                            updated = true;
+                        }
+                        if (updated) {
+                            contacts.save(existing);
+                        }
+                        listMembers.add(existing);
                     } else {
-                        importedContacts.add(contact);
+                        newContactsToSave.add(contact);
+                        listMembers.add(contact);
+                        existingByEmail.put(email, contact);
                     }
                 } catch (IllegalArgumentException exception) {
                     invalid++;
@@ -217,11 +245,14 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "CSV is malformed or has invalid headers: " + exception.getMessage());
         }
-        if (existing.size() + importedContacts.size() > maxTotalContacts) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
-                    "Tenant contact limit of " + maxTotalContacts + " would be exceeded");
+
+        if (!newContactsToSave.isEmpty()) {
+            if (existingByEmail.size() + newContactsToSave.size() > maxTotalContacts) {
+                throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+                        "Tenant contact limit of " + maxTotalContacts + " would be exceeded");
+            }
+            contacts.saveAll(newContactsToSave);
         }
-        contacts.saveAll(importedContacts);
 
         UUID folderId = null;
         String resolvedFolderName = null;
@@ -230,25 +261,30 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
             CustomerListRequest listReq = new CustomerListRequest(
                     resolvedFolderName,
                     "Imported folder from " + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "CSV file"),
-                    importedContacts.size(),
+                    listMembers.size(),
                     BigDecimal.ZERO.setScale(2),
                     "Imported Folder",
                     "ACTIVE",
                     false
             );
             MarketingCustomerList customerList = new MarketingCustomerList(UUID.randomUUID(), tenantId, listReq);
-            customerList.addMembers(new HashSet<>(importedContacts));
+            customerList.addMembers(new HashSet<>(listMembers));
             MarketingCustomerList saved = repository.save(customerList);
             folderId = saved.getId();
         } else if (targetListId != null) {
             MarketingCustomerList customerList = findForTenant(tenantId, targetListId);
-            customerList.addMembers(new HashSet<>(importedContacts));
+            customerList.addMembers(new HashSet<>(listMembers));
+            CustomerListRequest updateReq = new CustomerListRequest(
+                    customerList.getName(), customerList.getDescription(), customerList.getMembers().size(),
+                    customerList.getConversionRate(), customerList.getSegment(), customerList.getStatus(), customerList.isAiGenerated()
+            );
+            customerList.updateFrom(updateReq);
             MarketingCustomerList saved = repository.save(customerList);
             folderId = saved.getId();
             resolvedFolderName = saved.getName();
         }
 
-        return new ContactImportResponse(importedContacts.size(), duplicates, invalid, processed, errors, folderId, resolvedFolderName);
+        return new ContactImportResponse(newContactsToSave.size(), duplicates, invalid, processed, errors, folderId, resolvedFolderName, listMembers.size());
     }
 
     @Override
@@ -328,7 +364,10 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
 
         boolean hasEmail = indexes.containsKey("email") || indexes.containsKey("emailaddress")
                 || indexes.containsKey("mail") || indexes.containsKey("contactemail")
-                || rawHeaders.keySet().stream().anyMatch(h -> h != null && h.toLowerCase(Locale.ROOT).contains("email"));
+                || indexes.containsKey("schoolemail") || indexes.containsKey("workemail")
+                || indexes.containsKey("primaryemail") || indexes.containsKey("emailid")
+                || indexes.containsKey("businessemail") || indexes.containsKey("mailaddress")
+                || rawHeaders.keySet().stream().anyMatch(h -> h != null && (h.toLowerCase(Locale.ROOT).contains("email") || h.toLowerCase(Locale.ROOT).contains("mail")));
         if (!hasEmail) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "CSV requires an email header (e.g. 'Email', 'email', 'Email Address')");
@@ -339,6 +378,47 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
     private static String canonicalHeader(String raw) {
         if (raw == null) return "";
         return raw.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private String extractEmail(CSVRecord record, Map<String, Integer> indexes) {
+        String val = firstNonBlank(record, indexes,
+                "email", "emailaddress", "mail", "contactemail", "schoolemail",
+                "workemail", "businessemail", "primaryemail", "emailid",
+                "mailaddress", "admissionemail", "admissionsmail", "useremail");
+        if (!val.isBlank() && val.contains("@")) {
+            return val.trim().toLowerCase(Locale.ROOT);
+        }
+
+        for (Map.Entry<String, Integer> entry : indexes.entrySet()) {
+            String k = entry.getKey().toLowerCase(Locale.ROOT);
+            if (k.contains("email") || k.contains("mail")) {
+                int idx = entry.getValue();
+                if (idx < record.size()) {
+                    String candidate = record.get(idx).trim();
+                    if (!candidate.isBlank() && candidate.contains("@") && EMAIL.matcher(candidate.toLowerCase(Locale.ROOT)).matches()) {
+                        return candidate.toLowerCase(Locale.ROOT);
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < record.size(); i++) {
+            String cell = record.get(i).trim();
+            if (cell.contains("@") && EMAIL.matcher(cell.toLowerCase(Locale.ROOT)).matches()) {
+                return cell.toLowerCase(Locale.ROOT);
+            }
+        }
+
+        return "";
+    }
+
+    private boolean isGenericName(String name) {
+        if (name == null || name.isBlank()) return true;
+        String n = name.trim().toLowerCase(Locale.ROOT);
+        return n.equals("mail") || n.equals("contact") || n.equals("mail contact") || n.equals("primary")
+                || n.equals("primary contact") || n.equals("admission") || n.equals("admission contact")
+                || n.equals("admissions") || n.equals("admissions contact") || n.equals("info") || n.equals("info contact")
+                || n.equals("null") || n.equals("—");
     }
 
     private String firstNonBlank(CSVRecord record, Map<String, Integer> indexes, String... candidates) {
@@ -361,7 +441,7 @@ public class MarketingCustomerListServiceImpl implements MarketingCustomerListSe
     }
 
     private MarketingContact contactFromRecord(UUID tenantId, CSVRecord record, Map<String, Integer> indexes) {
-        String email = firstNonBlank(record, indexes, "email", "emailaddress", "mail", "contactemail").toLowerCase(Locale.ROOT);
+        String email = extractEmail(record, indexes);
         if (email.isBlank() || email.length() > 320 || !EMAIL.matcher(email).matches()) {
             throw new IllegalArgumentException("Invalid email: " + (email.isBlank() ? "empty" : email));
         }

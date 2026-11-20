@@ -10,9 +10,16 @@ public record ContactImportResponse(
         int processed,
         List<RowError> errors,
         UUID folderId,
-        String folderName) {
+        String folderName,
+        int listMemberCount) {
+
     public ContactImportResponse(int imported, int duplicates, int invalid, int processed, List<RowError> errors) {
-        this(imported, duplicates, invalid, processed, errors, null, null);
+        this(imported, duplicates, invalid, processed, errors, null, null, imported);
     }
+
+    public ContactImportResponse(int imported, int duplicates, int invalid, int processed, List<RowError> errors, UUID folderId, String folderName) {
+        this(imported, duplicates, invalid, processed, errors, folderId, folderName, imported);
+    }
+
     public record RowError(int row, String message) {}
 }

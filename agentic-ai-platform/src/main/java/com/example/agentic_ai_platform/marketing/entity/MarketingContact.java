@@ -139,8 +139,11 @@ public class MarketingContact {
     public UUID getTenantId() { return tenantId; }
     public String getEmail() { return email; }
     public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
     public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
     public String getCompany() { return company; }
+    public void setCompany(String company) { this.company = company; }
     public String getTitle() { return title; }
     public String getIndustry() { return industry; }
     public String getCountry() { return country; }

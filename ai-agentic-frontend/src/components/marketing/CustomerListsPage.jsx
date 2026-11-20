@@ -321,20 +321,27 @@ export const CustomerListsPage = () => {
       if (csvInputRef.current) csvInputRef.current.value = '';
       setActiveTab('contacts');
 
-      const count = typeof res?.imported === 'number' ? res.imported : (Array.isArray(res) ? res.length : 0);
+      const newImported = typeof res?.imported === 'number' ? res.imported : (Array.isArray(res) ? res.length : 0);
+      const listCount = typeof res?.listMemberCount === 'number' ? res.listMemberCount : newImported;
       const dup = res?.duplicates || 0;
       const inv = res?.invalid || 0;
-      let msg = `${count} contact${count !== 1 ? 's' : ''} imported successfully`;
+
+      let msg = '';
       if (res?.folderName) {
-        msg += ` into folder "${res.folderName}"`;
+        msg = `Folder "${res.folderName}" saved with ${listCount} contact${listCount !== 1 ? 's' : ''}`;
+        if (newImported > 0) {
+          msg += ` (${newImported} newly added to database)`;
+        }
+      } else {
+        msg = `${newImported} contact${newImported !== 1 ? 's' : ''} imported into global pool`;
       }
       msg += '.';
-      if (dup > 0) msg += ` (${dup} duplicate${dup > 1 ? 's' : ''} skipped)`;
+      if (dup > 0 && !res?.folderName) msg += ` (${dup} duplicate${dup > 1 ? 's' : ''} skipped)`;
       if (inv > 0) msg += ` (${inv} invalid row${inv > 1 ? 's' : ''})`;
       if (res?.errors?.length > 0) {
         msg += ` Error on row ${res.errors[0].row}: ${res.errors[0].message}`;
       }
-      showNotice(msg, inv > 0 && count === 0 ? 'error' : 'success');
+      showNotice(msg, inv > 0 && newImported === 0 && listCount === 0 ? 'error' : 'success');
     } catch (err) {
       showNotice(`Import failed: ${err.message}`, 'error');
     } finally {
