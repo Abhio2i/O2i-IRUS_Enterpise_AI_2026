@@ -31,6 +31,7 @@
 - **🔐 Zero-Trust Auth** — JWT access/refresh tokens, BCrypt password hashing, OAuth2 Resource Server, multi-tenant isolation
 - **📄 AI Document Processing** — Upload any document → Apache Tika extracts text → Regex extracts structured fields with confidence scores → SHA-256 deduplication → Auto-approve or flag to Exception Queue
 - **📧 AI Email Campaigns** — Groq LLM generates personalized outreach emails grounded in your uploaded brochures/catalogs, then sends via SMTP to imported CSV contacts
+- **📬 Email Engagement Tracking & IMAP Reply Intelligence** — 100% free, provider-agnostic 1x1 open pixel tracking, instant link click redirection, IMAP SSL inbound reply synchronization, smart thread parsing, and company-enriched analytics
 - **🔍 Live SEO Rank Tracking** — SerpAPI queries real Google results for your keywords, finds your domain position in top 100 organic results, tracks rank history with deltas
 - **🤖 AI SEO Optimization** — Groq AI generates optimized meta titles, descriptions, H2 headings, and actionable recommendations for each tracked keyword
 - **📊 Customer 360** — Unified customer view with health scores, churn probability, engagement signals, and AI-generated cross-sell/upsell/retention offers
@@ -153,7 +154,7 @@ The platform has **6 pillars** with **43+ routes** and **50+ page components**:
 
 | Page | What it does |
 |:---|:---|
-| **Email Sender (Content Studio)** | 3-step flow: Select audience (domain/list/direct) → AI-generate email (Groq + brochure grounding) → Send via SMTP with personalization tokens (`{{firstName}}`, `{{company}}`) |
+| **Email Sender (Content Studio)** | 3-step outreach workflow with AI generation grounded in brochures. Features **Responses & Inbox** tracking dashboard with real-time Email Opens (1x1 pixel), Link Clicks (302 redirect), IMAP reply synchronization (GoDaddy/Gmail/M365), smart thread parsing (separating incoming replies from original pitch), and live activity streams enriched with Company Names |
 | **SEO Keywords** | Track keywords with live Google rank via SerpAPI. Click "Optimize" → Groq AI generates meta title, description, H2 headings, and actionable SEO checklist. "Check Rank" re-fetches live position. "Sweep" updates all keywords at once |
 | **Customer Lists** | Import contacts via CSV (email, company, industry, revenue, churn probability). Create AI-segmented lists with Groq-powered contact selection |
 | **Customer 360** | Unified account view with Tier (1-4), ARR, health score, churn probability. Engagement signals (usage, API telemetry, portal analytics). AI-generated offers (cross-sell, upsell, retention) |
@@ -451,6 +452,7 @@ A complete **Postman Collection** is included:
 | V7 | `create_marketing_proposals` | `mkt_proposals` |
 | V8 | `create_customer_360` | `mkt_customer_360_accounts`, `_signals`, `_offers` |
 | V9 | `create_seo_keywords` | `mkt_seo_keywords` (rank history, difficulty, intent) |
+| V11 | `create_email_tracking_and_replies` | `mkt_campaign_events` (opens & clicks), `mkt_campaign_replies` (IMAP inbox) |
 
 **Design patterns:**
 - **Multi-tenant** — Every table has `tenant_id` (UUID) with FK to `dms_tenants`
@@ -497,6 +499,30 @@ A complete **Postman Collection** is included:
 | **Rank History** | Stores `current_rank` and `previous_rank`, calculates delta |
 | **101 = Not Found** | If domain isn't in top 100, rank is set to 101 |
 | **Bulk Sweep** | Updates all tracked keywords in one operation |
+
+---
+
+## 📬 Email Engagement Tracking & Inbound Reply Intelligence
+
+The platform includes a **100% free, provider-agnostic, enterprise tracking system** that matches the architecture of HubSpot, Salesforce, and Apollo.io:
+
+- **1x1 Transparent Open Pixel**:
+  - Automatically injected before `</body>` in all outreach emails.
+  - Returns a 42-byte invisible GIF with `no-cache` headers, recording recipient email, IP address, and timestamp.
+- **Instant Link Click Redirection (HTTP 302)**:
+  - Automatically rewrites anchor links (`<a href="...">`) to route through `/api/public/track/click`.
+  - Records click events with target URL and forwards the user to their destination in <20ms.
+- **GoDaddy / Any IMAP Inbound Reply Sync (Port 993 SSL)**:
+  - `EmailReplySyncService` polls your mailbox via secure IMAP SSL and fetches incoming replies from leads/schools.
+  - **Smart Regex Thread Parsing**: Automatically strips out quoted pitch history (`On ... wrote:`, `-----Original Message-----`) so only the clean respondent text is displayed.
+  - **Auto-Confirmed Opens**: Automatically credits a verified `OPEN` event upon receiving a reply, overcoming mail client image blocking.
+- **Company & Contact Name Enrichment**:
+  - Automatically resolves recipient email to their registered **Company Name** (e.g. *MTU Maintenance Canada Ltd*, *Win Global*, *Wheatley School*) and personal contact name.
+- **Responses & Inbox Dashboard (`ContentStudioPage.jsx`)**:
+  - Live 4-card funnel: **Campaigns Sent**, **Email Opens**, **Link Clicks**, and **Inbound Replies**.
+  - Interactive view toggle between **Inbound Replies Inbox** and **Live Opens & Clicks Activity Feed**.
+  - **Read Full Message Modal**: Displays a prominent green card for the recipient's reply at the top, and a clean collapsible card for the original outreach pitch at the bottom.
+  - Complete architecture guide available in [EMAIL_TRACKING_ARCHITECTURE_GUIDE.md](EMAIL_TRACKING_ARCHITECTURE_GUIDE.md).
 
 ---
 
