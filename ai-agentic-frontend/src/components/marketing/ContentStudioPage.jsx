@@ -2463,7 +2463,7 @@ export const ContentStudioPage = () => {
               {/* Scrollable Body */}
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, paddingRight: 4 }}>
                 
-                {/* 🟢 CARD 1: RECIPIENT'S REPLY (UNKA REPLY) */}
+                {/* 🟢 CARD 1: RECIPIENT'S RESPONSE */}
                 <div style={{
                   background: 'rgba(16, 185, 129, 0.06)',
                   border: '1.5px solid rgba(16, 185, 129, 0.35)',
@@ -2475,7 +2475,7 @@ export const ContentStudioPage = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid rgba(16, 185, 129, 0.2)', paddingBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#047857', fontWeight: 800, fontSize: 12.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       <span>💬</span>
-                      <span>Unka Reply (Recipient's Response)</span>
+                      <span>Recipient's Response</span>
                     </div>
                     <span style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>
                       Latest Incoming Message
@@ -2493,7 +2493,7 @@ export const ContentStudioPage = () => {
                   </div>
                 </div>
 
-                {/* ⚪ CARD 2: OUR ORIGINAL OUTREACH / PREVIOUS THREAD (HAMARA BHEJA GAYA EMAIL) */}
+                {/* ⚪ CARD 2: ORIGINAL OUTREACH / THREAD HISTORY */}
                 {quotedText ? (
                   <div style={{
                     background: 'var(--bg-hover)',
@@ -2514,7 +2514,7 @@ export const ContentStudioPage = () => {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         <span>📜</span>
-                        <span>Hamara Bheja Gaya Email (Our Original Pitch / Thread History)</span>
+                        <span>Original Outreach Pitch / Thread History</span>
                       </div>
                       <button
                         type="button"
