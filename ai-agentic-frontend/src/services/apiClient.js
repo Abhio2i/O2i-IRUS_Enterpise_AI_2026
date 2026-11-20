@@ -2669,4 +2669,61 @@ export async function checkKeywordRank(seoKeywordId) {
   return res.json();
 }
 
+/**
+ * Get Tracking & Engagement Summary
+ * GET /api/marketing/tracking/summary
+ */
+export async function getTrackingSummary() {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/tracking/summary`, {
+    method: 'GET',
+    headers,
+  });
+  if (!res.ok) return { totalOpens: 0, uniqueOpens: 0, totalClicks: 0, uniqueClicks: 0, totalReplies: 0, unreadReplies: 0 };
+  return res.json();
+}
+
+/**
+ * Get Campaign Replies / Inbound Responses
+ * GET /api/marketing/replies
+ */
+export async function getCampaignReplies() {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/replies`, {
+    method: 'GET',
+    headers,
+  });
+  if (!res.ok) return { replies: [], totalReplies: 0, unreadReplies: 0 };
+  return res.json();
+}
+
+/**
+ * Trigger IMAP Sync on-demand
+ * POST /api/marketing/replies/sync
+ */
+export async function syncCampaignReplies() {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/replies/sync`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to sync campaign replies');
+  return res.json();
+}
+
+/**
+ * Mark Reply as Read
+ * PATCH /api/marketing/replies/{id}/read
+ */
+export async function markReplyAsRead(replyId) {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/replies/${encodeURIComponent(replyId)}/read`, {
+    method: 'PATCH',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to mark reply as read');
+  return true;
+}
+
+
 

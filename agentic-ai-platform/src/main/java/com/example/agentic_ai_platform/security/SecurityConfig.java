@@ -24,6 +24,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/marketing/campaigns/senders").permitAll()
                         .requestMatchers("/", "/index.html", "/*.html", "/css/**", "/js/**", "/favicon.ico", "/error").permitAll()
                         .anyRequest().authenticated())

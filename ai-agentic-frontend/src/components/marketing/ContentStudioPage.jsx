@@ -5,7 +5,8 @@ import { addAuditLog } from '../../store/governanceSlice';
 import {
   Mail, CheckCircle, ShieldCheck, Send, Eye,
   Globe, RefreshCw, AlertCircle, FileText, Trash2, ArrowRight, Sparkles, Server, Users, Zap,
-  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser, XCircle, Paperclip
+  Bold, Italic, Underline, List, ListOrdered, Link2, Type, Code, Eraser, XCircle, Paperclip,
+  Inbox, MessageSquare, MousePointer, Activity, MailCheck
 } from 'lucide-react';
 import {
   getContactsByDomain,
@@ -22,6 +23,10 @@ import {
   listCampaigns,
   listMarketingAssets,
   getProposalDocumentBlob,
+  getTrackingSummary,
+  getCampaignReplies,
+  syncCampaignReplies,
+  markReplyAsRead,
 } from '../../services/apiClient';
 
 export const ContentStudioPage = () => {
@@ -125,6 +130,20 @@ export const ContentStudioPage = () => {
   const [_loadingTemplates, setLoadingTemplates] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+
+  // Reply & Engagement Tracking state
+  const [repliesList, setRepliesList] = useState([]);
+  const [trackingSummary, setTrackingSummary] = useState({
+    totalOpens: 0,
+    uniqueOpens: 0,
+    totalClicks: 0,
+    uniqueClicks: 0,
+    totalReplies: 0,
+    unreadReplies: 0,
+  });
+  const [isSyncingReplies, setIsSyncingReplies] = useState(false);
+  const [selectedReply, setSelectedReply] = useState(null);
+  const [replyFilter, setReplyFilter] = useState('ALL'); // 'ALL' | 'UNREAD'
 
   // Notices
   const [notice, setNotice] = useState('');
@@ -352,6 +371,46 @@ export const ContentStudioPage = () => {
     ...reduxCampaigns.filter(rc => !backendCampaigns.some(bc => (bc.campaignId && bc.campaignId === rc.id) || bc.id === rc.id)),
   ];
 
+  const fetchTrackingAndReplies = async () => {
+    try {
+      const [sum, rep] = await Promise.all([
+        getTrackingSummary().catch(() => null),
+        getCampaignReplies().catch(() => null),
+      ]);
+      if (sum) setTrackingSummary(sum);
+      if (rep && Array.isArray(rep.replies)) setRepliesList(rep.replies);
+    } catch (err) {
+      console.warn('Could not load tracking/replies:', err);
+    }
+  };
+
+  const handleManualSyncReplies = async () => {
+    setIsSyncingReplies(true);
+    try {
+      const res = await syncCampaignReplies();
+      if (res.status === 'SUCCESS') {
+        showFeedback(res.message + (res.newReplies > 0 ? ` (${res.newReplies} new replies synchronized!)` : ' (Inbox is up-to-date)'), 'success');
+      } else {
+        showFeedback(res.message || 'Sync completed', 'info');
+      }
+      await fetchTrackingAndReplies();
+    } catch (err) {
+      showFeedback(`Reply sync failed: ${err.message}`, 'error');
+    } finally {
+      setIsSyncingReplies(false);
+    }
+  };
+
+  const handleMarkReplyRead = async (replyId) => {
+    try {
+      await markReplyAsRead(replyId);
+      setRepliesList(prev => prev.map(r => r.id === replyId ? { ...r, isRead: true } : r));
+      setTrackingSummary(prev => ({ ...prev, unreadReplies: Math.max(0, (prev.unreadReplies || 1) - 1) }));
+    } catch (err) {
+      console.warn('Failed to mark reply as read:', err);
+    }
+  };
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const preselectedListId = localStorage.getItem('selectedCampaignListId');
@@ -364,6 +423,7 @@ export const ContentStudioPage = () => {
     fetchSavedLists();
     fetchMarketingAssets();
     fetchCampaignsList();
+    fetchTrackingAndReplies();
     getSenderConfig()
       .then(cfg => {
         if (cfg?.defaultSender) {
@@ -734,6 +794,39 @@ export const ContentStudioPage = () => {
             onClick={() => setActiveTab('Templates')}
           >
             <FileText size={13} /> Email Templates ({templates.length})
+          </button>
+          <button
+            className={`btn btn-sm ${activeTab === 'Responses' ? 'btn-solid' : 'btn-ghost'}`}
+            onClick={() => {
+              setActiveTab('Responses');
+              fetchTrackingAndReplies();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              background: activeTab === 'Responses' ? 'var(--brand-primary, #2563eb)' : undefined,
+              color: activeTab === 'Responses' ? '#fff' : undefined,
+            }}
+          >
+            <Inbox size={13} /> Responses & Inbox
+            {trackingSummary.unreadReplies > 0 ? (
+              <span style={{
+                background: '#ef4444',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '1px 5px',
+                borderRadius: 10,
+                marginLeft: 3
+              }}>
+                {trackingSummary.unreadReplies}
+              </span>
+            ) : (
+              <span style={{ fontSize: 11, opacity: 0.8, marginLeft: 2 }}>
+                ({repliesList.length})
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -2056,6 +2149,304 @@ export const ContentStudioPage = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* RESPONSES & INBOUND TRACKING INBOX TAB */}
+      {activeTab === 'Responses' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Top Banner & IMAP Sync */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Inbox size={18} color="var(--brand-primary, #2563eb)" /> Inbound Replies & Engagement Tracking
+              </h3>
+              <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                Real-time tracking of recipient opens, link clicks, and school responses synchronized directly from GoDaddy IMAP (<code>ab2@o2i.tech</code>).
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', background: 'var(--bg-elevated)', borderRadius: 6, padding: 2, border: '1px solid var(--border-subtle)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${replyFilter === 'ALL' ? 'btn-solid' : 'btn-ghost'}`}
+                  onClick={() => setReplyFilter('ALL')}
+                >
+                  All ({repliesList.length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${replyFilter === 'UNREAD' ? 'btn-solid' : 'btn-ghost'}`}
+                  onClick={() => setReplyFilter('UNREAD')}
+                  style={{ color: trackingSummary.unreadReplies > 0 ? '#ef4444' : undefined }}
+                >
+                  Unread ({trackingSummary.unreadReplies})
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-sm btn-solid"
+                onClick={handleManualSyncReplies}
+                disabled={isSyncingReplies}
+                style={{
+                  background: 'var(--brand-primary, #2563eb)',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 600,
+                  boxShadow: '0 1px 3px rgba(37,99,235,0.25)'
+                }}
+              >
+                <RefreshCw size={13} className={isSyncingReplies ? 'spin' : ''} />
+                {isSyncingReplies ? 'Syncing GoDaddy Inbox...' : 'Sync Replies Now'}
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Funnel Stats Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
+            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #2563eb' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Campaigns Sent</span>
+                <Send size={15} color="#2563eb" />
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>
+                {campaignsList.length}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                Bulk outreach campaigns
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Email Opens</span>
+                <Eye size={15} color="#10b981" />
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981' }}>
+                {trackingSummary.uniqueOpens} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({trackingSummary.totalOpens} total)</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                1x1 transparent tracking pixel
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Link Clicks</span>
+                <MousePointer size={15} color="#f59e0b" />
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#f59e0b' }}>
+                {trackingSummary.uniqueClicks} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({trackingSummary.totalClicks} total)</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                AR/VR biology & chemistry links
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Inbound Replies</span>
+                <Inbox size={15} color="#8b5cf6" />
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#8b5cf6' }}>
+                {trackingSummary.totalReplies} <span style={{ fontSize: 12, fontWeight: 600, color: '#ef4444' }}>{trackingSummary.unreadReplies > 0 ? `(${trackingSummary.unreadReplies} new)` : ''}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                Synced from GoDaddy IMAP
+              </div>
+            </div>
+          </div>
+
+          {/* Replies Inbox List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {(() => {
+              const filtered = repliesList.filter(r => replyFilter === 'ALL' || !r.isRead);
+              if (filtered.length === 0) {
+                return (
+                  <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                    <Inbox size={32} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
+                      {replyFilter === 'UNREAD' ? 'No unread replies' : 'No incoming school responses found yet'}
+                    </div>
+                    <div>
+                      When schools or contacts reply to your emails, their messages will appear here automatically.
+                      Click <strong>"Sync Replies Now"</strong> above to check your GoDaddy mailbox.
+                    </div>
+                  </div>
+                );
+              }
+
+              return filtered.map((reply) => (
+                <div
+                  key={reply.id}
+                  className="card"
+                  style={{
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    borderLeft: `4px solid ${reply.isRead ? 'var(--border-default)' : '#2563eb'}`,
+                    background: reply.isRead ? 'var(--bg-elevated)' : 'rgba(37,99,235,0.03)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {!reply.isRead && (
+                        <span style={{
+                          background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700,
+                          padding: '2px 6px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: 0.5
+                        }}>
+                          NEW
+                        </span>
+                      )}
+                      <span style={{
+                        background: 'rgba(16,185,129,0.15)', color: '#047857',
+                        padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11
+                      }}>
+                        🏫 {reply.schoolName || 'Partner School'}
+                      </span>
+                      <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                        {reply.senderName || reply.senderEmail}
+                      </strong>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        &lt;{reply.senderEmail}&gt;
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      {new Date(reply.receivedAt).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Subject: {reply.subject || 'No Subject'}
+                  </div>
+
+                  <div style={{
+                    fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
+                    background: 'var(--bg-hover)', padding: '8px 12px', borderRadius: 6
+                  }}>
+                    {reply.snippet || '(No text preview available)'}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-solid"
+                        onClick={() => {
+                          setSelectedReply(reply);
+                          if (!reply.isRead) handleMarkReplyRead(reply.id);
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <Eye size={11} /> Read Full Message
+                      </button>
+                      <a
+                        href={`mailto:${encodeURIComponent(reply.senderEmail)}?subject=${encodeURIComponent('Re: ' + (reply.subject || ''))}`}
+                        className="btn btn-xs btn-ghost"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+                      >
+                        <Mail size={11} /> Reply via Email
+                      </a>
+                    </div>
+                    {!reply.isRead && (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => handleMarkReplyRead(reply.id)}
+                        style={{ fontSize: 11, color: 'var(--text-muted)' }}
+                      >
+                        <CheckCircle size={11} /> Mark as Read
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* FULL REPLY MESSAGE MODAL */}
+      {selectedReply && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: 16, backdropFilter: 'blur(4px)'
+          }}
+          onClick={() => setSelectedReply(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-elevated)', borderRadius: 12,
+              border: '1px solid var(--border-default)', maxWidth: 640, width: '100%',
+              padding: 22, maxHeight: '85vh', display: 'flex', flexDirection: 'column'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10 }}>
+              <div>
+                <span style={{
+                  background: 'rgba(16,185,129,0.15)', color: '#047857',
+                  padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11, display: 'inline-block', marginBottom: 4
+                }}>
+                  🏫 {selectedReply.schoolName || 'School'}
+                </span>
+                <h3 style={{ margin: '4px 0 2px', fontSize: 16, fontWeight: 700 }}>
+                  {selectedReply.subject || 'No Subject'}
+                </h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  From: <strong>{selectedReply.senderName || selectedReply.senderEmail}</strong> &lt;{selectedReply.senderEmail}&gt;
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Received: {new Date(selectedReply.receivedAt).toLocaleString()}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={() => setSelectedReply(null)}
+                style={{ fontSize: 16, lineHeight: 1 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              flex: 1, overflowY: 'auto', padding: '14px 16px', background: 'var(--bg-hover)',
+              borderRadius: 8, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-primary)',
+              fontFamily: 'inherit', border: '1px solid var(--border-subtle)'
+            }}>
+              {selectedReply.bodyText || selectedReply.snippet || '(No message text)'}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Message-ID: <code>{selectedReply.messageId ? selectedReply.messageId.substring(0, 30) + '...' : 'N/A'}</code>
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a
+                  href={`mailto:${encodeURIComponent(selectedReply.senderEmail)}?subject=${encodeURIComponent('Re: ' + (selectedReply.subject || ''))}`}
+                  className="btn btn-sm btn-solid"
+                  style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', textDecoration: 'none' }}
+                >
+                  <Mail size={12} /> Reply via Email
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setSelectedReply(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

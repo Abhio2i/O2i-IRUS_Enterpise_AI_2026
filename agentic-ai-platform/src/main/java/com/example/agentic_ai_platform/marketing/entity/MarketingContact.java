@@ -146,6 +146,7 @@ public class MarketingContact {
     public String getCountry() { return country; }
     public BigDecimal getAnnualRevenue() { return annualRevenue; }
     public String getCustomerStatus() { return customerStatus; }
+    public void setCustomerStatus(String customerStatus) { this.customerStatus = customerStatus; }
     public BigDecimal getChurnProbability() { return churnProbability; }
     public String getCategory() { return category; }
     public String getType() { return type; }

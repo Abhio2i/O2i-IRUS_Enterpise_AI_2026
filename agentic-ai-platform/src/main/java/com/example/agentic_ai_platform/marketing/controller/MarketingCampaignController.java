@@ -49,6 +49,9 @@ public class MarketingCampaignController {
     private final String allowedSendersConfig;
     private final int batchSize;
     private final int pauseSeconds;
+
+    @Value("${app.marketing.tracking.base-url:http://localhost:9095}")
+    private String trackingBaseUrl = "http://localhost:9095";
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     private final Map<UUID, CampaignState> campaigns = new ConcurrentHashMap<>();
@@ -259,7 +262,9 @@ public class MarketingCampaignController {
                     helper.setBcc(bccAddresses);
                 }
                 helper.setSubject(personalizedSubject);
-                helper.setText(html, true);
+                String trackedHtml = injectTracking(html, campaignId, contact.email());
+                helper.setText(trackedHtml, true);
+                message.setHeader("Message-ID", "<cmp-" + campaignId + "-" + Math.abs(contact.email().hashCode()) + "@" + (effectiveFrom.contains("@") ? effectiveFrom.split("@")[1] : "o2i.tech") + ">");
                 if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
                 for (CampaignAttachment att : emailAttachments) {
                     helper.addAttachment(att.filename(), new ByteArrayResource(att.data()), att.contentType());
@@ -351,7 +356,9 @@ public class MarketingCampaignController {
                         helper.setBcc(bccAddresses);
                     }
                     helper.setSubject(personalizedSubject);
-                    helper.setText(html, true);
+                    String trackedHtml = injectTracking(html, campaignId, contact.email());
+                    helper.setText(trackedHtml, true);
+                    message.setHeader("Message-ID", "<cmp-" + campaignId + "-" + Math.abs(contact.email().hashCode()) + "@" + (effectiveFrom.contains("@") ? effectiveFrom.split("@")[1] : "o2i.tech") + ">");
                     if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
                     for (CampaignAttachment att : emailAttachments) {
                         helper.addAttachment(att.filename(), new ByteArrayResource(att.data()), att.contentType());
@@ -550,6 +557,26 @@ public class MarketingCampaignController {
         resp.put("sentCount", state.sentCount());
         resp.put("totalRecipients", state.totalRecipients());
         return ResponseEntity.ok(resp);
+    }
+
+    private String injectTracking(String html, UUID campaignId, String recipientEmail) {
+        if (html == null) return "";
+        String trackingHtml = html;
+        if (trackingBaseUrl != null && !trackingBaseUrl.isBlank() && campaignId != null && recipientEmail != null) {
+            String encodedEmail = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(recipientEmail.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            String pixelUrl = trackingBaseUrl.replaceAll("/+$", "") + "/api/public/track/open/" + campaignId + "/" + encodedEmail + ".png";
+            String pixelTag = "\n<img src=\"" + pixelUrl + "\" width=\"1\" height=\"1\" alt=\"\" style=\"display:none !important; width:1px; height:1px; border:0; outline:none;\" />";
+
+            String clickPrefix = trackingBaseUrl.replaceAll("/+$", "") + "/api/public/track/click?c=" + campaignId + "&e=" + encodedEmail + "&url=";
+            trackingHtml = trackingHtml.replaceAll("href=\"(https?://(?!.*track/click)[^\"]+)\"", "href=\"" + clickPrefix + "$1\"");
+
+            if (trackingHtml.toLowerCase().contains("</body>")) {
+                trackingHtml = trackingHtml.replaceFirst("(?i)</body>", pixelTag + "</body>");
+            } else {
+                trackingHtml = trackingHtml + pixelTag;
+            }
+        }
+        return trackingHtml;
     }
 
     private boolean isGenericName(String name) {
