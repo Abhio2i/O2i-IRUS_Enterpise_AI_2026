@@ -193,6 +193,16 @@ public class EmailTrackingController {
         return ResponseEntity.ok(summary);
     }
 
+    /**
+     * 7. Authenticated: Recent tracking events (Opens & Clicks live stream)
+     */
+    @GetMapping("/api/marketing/tracking/events")
+    public ResponseEntity<List<MarketingCampaignEvent>> getTrackingEvents(JwtAuthenticationToken auth) {
+        UUID tenantId = tenantId(auth);
+        List<MarketingCampaignEvent> events = eventRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
+        return ResponseEntity.ok(events);
+    }
+
     private String decodeEmail(String encoded) {
         if (encoded == null || encoded.isBlank()) return "unknown@recipient.com";
         try {

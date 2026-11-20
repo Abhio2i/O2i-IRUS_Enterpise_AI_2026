@@ -2725,5 +2725,20 @@ export async function markReplyAsRead(replyId) {
   return true;
 }
 
+/**
+ * Get Tracking Events Live Activity (Opens & Clicks)
+ * GET /api/marketing/tracking/events
+ */
+export async function getTrackingEvents() {
+  let headers = getAuthHeaders();
+  let res = await fetch(`${BACKEND_URL}/api/marketing/tracking/events`, {
+    method: 'GET',
+    headers,
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+
 
 

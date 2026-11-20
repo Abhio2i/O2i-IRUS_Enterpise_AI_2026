@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 public interface MarketingCampaignEventRepository extends JpaRepository<MarketingCampaignEvent, UUID> {
     long countByTenantIdAndEventType(UUID tenantId, String eventType);
 
+    boolean existsByTenantIdAndEventTypeAndContactEmail(UUID tenantId, String eventType, String contactEmail);
+
     long countByTenantIdAndCampaignIdAndEventType(UUID tenantId, UUID campaignId, String eventType);
 
     @Query("SELECT COUNT(DISTINCT e.contactEmail) FROM MarketingCampaignEvent e WHERE e.tenantId = :tenantId AND e.eventType = :eventType")

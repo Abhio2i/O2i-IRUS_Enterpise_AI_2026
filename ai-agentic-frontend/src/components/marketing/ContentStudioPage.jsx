@@ -24,6 +24,7 @@ import {
   listMarketingAssets,
   getProposalDocumentBlob,
   getTrackingSummary,
+  getTrackingEvents,
   getCampaignReplies,
   syncCampaignReplies,
   markReplyAsRead,
@@ -146,6 +147,9 @@ export const ContentStudioPage = () => {
   const [replyFilter, setReplyFilter] = useState('ALL'); // 'ALL' | 'UNREAD'
   const [showOriginalThread, setShowOriginalThread] = useState(false);
   const [copiedReply, setCopiedReply] = useState(false);
+  const [trackingEvents, setTrackingEvents] = useState([]);
+  const [activeTrackingView, setActiveTrackingView] = useState('REPLIES'); // 'REPLIES' | 'EVENTS'
+  const [eventFilter, setEventFilter] = useState('ALL'); // 'ALL' | 'OPEN' | 'CLICK'
 
   // Notices
   const [notice, setNotice] = useState('');
@@ -402,12 +406,14 @@ export const ContentStudioPage = () => {
 
   const fetchTrackingAndReplies = async () => {
     try {
-      const [sum, rep] = await Promise.all([
+      const [sum, rep, evts] = await Promise.all([
         getTrackingSummary().catch(() => null),
         getCampaignReplies().catch(() => null),
+        getTrackingEvents().catch(() => []),
       ]);
       if (sum) setTrackingSummary(sum);
       if (rep && Array.isArray(rep.replies)) setRepliesList(rep.replies);
+      if (Array.isArray(evts)) setTrackingEvents(evts);
     } catch (err) {
       console.warn('Could not load tracking/replies:', err);
     }
@@ -2236,7 +2242,12 @@ export const ContentStudioPage = () => {
 
           {/* 4 Funnel Stats Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
-            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #2563eb' }}>
+            <div
+              className="card"
+              style={{ padding: '14px 16px', borderLeft: '4px solid #2563eb', cursor: 'pointer', transition: 'all 0.2s ease' }}
+              onClick={() => setActiveTab('Campaigns')}
+              title="Click to view all Campaigns"
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Campaigns Sent</span>
                 <Send size={15} color="#2563eb" />
@@ -2249,7 +2260,18 @@ export const ContentStudioPage = () => {
               </div>
             </div>
 
-            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+            <div
+              className="card"
+              style={{
+                padding: '14px 16px',
+                borderLeft: '4px solid #10b981',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: activeTrackingView === 'EVENTS' && eventFilter === 'OPEN' ? 'rgba(16,185,129,0.08)' : undefined
+              }}
+              onClick={() => { setActiveTrackingView('EVENTS'); setEventFilter('OPEN'); }}
+              title="Click to view Email Opens log"
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Email Opens</span>
                 <Eye size={15} color="#10b981" />
@@ -2262,7 +2284,18 @@ export const ContentStudioPage = () => {
               </div>
             </div>
 
-            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+            <div
+              className="card"
+              style={{
+                padding: '14px 16px',
+                borderLeft: '4px solid #f59e0b',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: activeTrackingView === 'EVENTS' && eventFilter === 'CLICK' ? 'rgba(245,158,11,0.08)' : undefined
+              }}
+              onClick={() => { setActiveTrackingView('EVENTS'); setEventFilter('CLICK'); }}
+              title="Click to view Link Clicks log"
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Link Clicks</span>
                 <MousePointer size={15} color="#f59e0b" />
@@ -2271,11 +2304,22 @@ export const ContentStudioPage = () => {
                 {trackingSummary.uniqueClicks} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({trackingSummary.totalClicks} total)</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                AR/VR biology & chemistry links
+                Tracked links clicked by recipients
               </div>
             </div>
 
-            <div className="card" style={{ padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+            <div
+              className="card"
+              style={{
+                padding: '14px 16px',
+                borderLeft: '4px solid #8b5cf6',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                background: activeTrackingView === 'REPLIES' ? 'rgba(139,92,246,0.08)' : undefined
+              }}
+              onClick={() => setActiveTrackingView('REPLIES')}
+              title="Click to view Inbound Replies"
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Inbound Replies</span>
                 <Inbox size={15} color="#8b5cf6" />
@@ -2289,7 +2333,153 @@ export const ContentStudioPage = () => {
             </div>
           </div>
 
+          {/* View Mode Switcher: Replies Inbox vs Live Tracking Events */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10, flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${activeTrackingView === 'REPLIES' ? 'btn-solid' : 'btn-ghost'}`}
+                onClick={() => setActiveTrackingView('REPLIES')}
+                style={{
+                  background: activeTrackingView === 'REPLIES' ? 'var(--brand-primary, #2563eb)' : undefined,
+                  color: activeTrackingView === 'REPLIES' ? '#fff' : undefined,
+                  display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600
+                }}
+              >
+                <Inbox size={14} /> Inbound Replies ({repliesList.length})
+                {trackingSummary.unreadReplies > 0 && (
+                  <span style={{ background: '#ef4444', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10 }}>
+                    {trackingSummary.unreadReplies}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className={`btn btn-sm ${activeTrackingView === 'EVENTS' ? 'btn-solid' : 'btn-ghost'}`}
+                onClick={() => setActiveTrackingView('EVENTS')}
+                style={{
+                  background: activeTrackingView === 'EVENTS' ? 'var(--brand-primary, #2563eb)' : undefined,
+                  color: activeTrackingView === 'EVENTS' ? '#fff' : undefined,
+                  display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600
+                }}
+              >
+                <Activity size={14} /> Live Opens & Clicks Activity ({trackingEvents.length})
+              </button>
+            </div>
+
+            {activeTrackingView === 'EVENTS' && (
+              <div style={{ display: 'flex', background: 'var(--bg-elevated)', borderRadius: 6, padding: 2, border: '1px solid var(--border-subtle)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${eventFilter === 'ALL' ? 'btn-solid' : 'btn-ghost'}`}
+                  onClick={() => setEventFilter('ALL')}
+                >
+                  All ({trackingEvents.length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${eventFilter === 'OPEN' ? 'btn-solid' : 'btn-ghost'}`}
+                  onClick={() => setEventFilter('OPEN')}
+                  style={{ color: eventFilter === 'OPEN' ? undefined : '#10b981' }}
+                >
+                  Opens ({trackingSummary.totalOpens})
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${eventFilter === 'CLICK' ? 'btn-solid' : 'btn-ghost'}`}
+                  onClick={() => setEventFilter('CLICK')}
+                  style={{ color: eventFilter === 'CLICK' ? undefined : '#f59e0b' }}
+                >
+                  Clicks ({trackingSummary.totalClicks})
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Live Events Stream */}
+          {activeTrackingView === 'EVENTS' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(() => {
+                const filteredEvents = trackingEvents.filter(e => eventFilter === 'ALL' || e.eventType === eventFilter);
+                if (filteredEvents.length === 0) {
+                  return (
+                    <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                      <Activity size={32} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
+                        No tracking events recorded yet for this filter
+                      </div>
+                      <div>
+                        When recipients open outreach emails or click tracked links, real-time engagement events appear here immediately.
+                      </div>
+                    </div>
+                  );
+                }
+
+                return filteredEvents.map((evt) => (
+                  <div
+                    key={evt.id}
+                    className="card"
+                    style={{
+                      padding: '12px 16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderLeft: `4px solid ${evt.eventType === 'OPEN' ? '#10b981' : '#f59e0b'}`,
+                      background: evt.eventType === 'OPEN' ? 'rgba(16,185,129,0.03)' : 'rgba(245,158,11,0.03)',
+                      gap: 12,
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{
+                        background: evt.eventType === 'OPEN' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                        color: evt.eventType === 'OPEN' ? '#047857' : '#b45309',
+                        padding: '3px 8px', borderRadius: 4, fontWeight: 800, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4
+                      }}>
+                        {evt.eventType === 'OPEN' ? <Eye size={12} /> : <MousePointer size={12} />}
+                        {evt.eventType === 'OPEN' ? 'EMAIL OPENED' : 'LINK CLICKED'}
+                      </span>
+                      <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                        {evt.contactEmail || 'Recipient'}
+                      </strong>
+                      {evt.eventType === 'CLICK' && evt.targetUrl && (
+                        <a
+                          href={evt.targetUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: 11.5,
+                            color: '#2563eb',
+                            textDecoration: 'underline',
+                            maxWidth: 320,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            display: 'inline-block'
+                          }}
+                        >
+                          🔗 {evt.targetUrl}
+                        </a>
+                      )}
+                      {evt.eventType === 'OPEN' && (
+                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                          {evt.userAgent?.includes('Inbound Reply') ? '✓ Confirmed via Inbound Reply' : '✓ 1x1 Pixel Loaded'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      <span>IP: {evt.ipAddress || 'unknown'}</span>
+                      <span>{new Date(evt.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+
           {/* Replies Inbox List */}
+          {activeTrackingView === 'REPLIES' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {(() => {
               const filtered = repliesList.filter(r => replyFilter === 'ALL' || !r.isRead);
@@ -2399,6 +2589,7 @@ export const ContentStudioPage = () => {
               ));
             })()}
           </div>
+          )}
         </div>
       )}
 

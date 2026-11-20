@@ -2,6 +2,8 @@ package com.example.agentic_ai_platform.marketing.service;
 
 import com.example.agentic_ai_platform.marketing.entity.MarketingCampaignReply;
 import com.example.agentic_ai_platform.marketing.entity.MarketingContact;
+import com.example.agentic_ai_platform.marketing.entity.MarketingCampaignEvent;
+import com.example.agentic_ai_platform.marketing.repository.MarketingCampaignEventRepository;
 import com.example.agentic_ai_platform.marketing.repository.MarketingCampaignReplyRepository;
 import com.example.agentic_ai_platform.marketing.repository.MarketingContactRepository;
 import jakarta.mail.Address;
@@ -31,6 +33,7 @@ public class EmailReplySyncService {
 
     private final MarketingCampaignReplyRepository replyRepository;
     private final MarketingContactRepository contactRepository;
+    private final MarketingCampaignEventRepository eventRepository;
 
     @Value("${app.mail.imap.host:${spring.mail.host:}}")
     private String imapHost;
@@ -51,9 +54,11 @@ public class EmailReplySyncService {
     private boolean imapEnabled;
 
     public EmailReplySyncService(MarketingCampaignReplyRepository replyRepository,
-                                 MarketingContactRepository contactRepository) {
+                                 MarketingContactRepository contactRepository,
+                                 MarketingCampaignEventRepository eventRepository) {
         this.replyRepository = replyRepository;
         this.contactRepository = contactRepository;
+        this.eventRepository = eventRepository;
     }
 
     public Map<String, Object> syncReplies(UUID tenantId) {
@@ -67,6 +72,31 @@ public class EmailReplySyncService {
         }
 
         int newRepliesCount = 0;
+
+        // Ensure any existing replying contacts have confirmed OPEN events
+        try {
+            List<MarketingCampaignReply> existingReplies = replyRepository.findAllByTenantIdOrderByReceivedAtDesc(tenantId);
+            for (MarketingCampaignReply rep : existingReplies) {
+                if (rep.getSenderEmail() != null && !rep.getSenderEmail().isBlank()) {
+                    if (!eventRepository.existsByTenantIdAndEventTypeAndContactEmail(tenantId, "OPEN", rep.getSenderEmail())) {
+                        MarketingCampaignEvent openEvent = new MarketingCampaignEvent(
+                                UUID.randomUUID(),
+                                tenantId,
+                                rep.getCampaignId(),
+                                rep.getSenderEmail(),
+                                "OPEN",
+                                null,
+                                "IMAP-Verified",
+                                "Confirmed Open via Inbound Reply"
+                        );
+                        eventRepository.save(openEvent);
+                    }
+                }
+            }
+        } catch (Exception backfillEx) {
+            log.debug("Backfill open event note: {}", backfillEx.getMessage());
+        }
+
         Store store = null;
         Folder folder = null;
 
@@ -196,6 +226,26 @@ public class EmailReplySyncService {
 
                     replyRepository.save(reply);
                     newRepliesCount++;
+
+                    // Auto-record a confirmed OPEN event if one is not recorded yet (a reply confirms the email was opened)
+                    try {
+                        if (!eventRepository.existsByTenantIdAndEventTypeAndContactEmail(tenantId, "OPEN", senderEmail)) {
+                            MarketingCampaignEvent openEvent = new MarketingCampaignEvent(
+                                    UUID.randomUUID(),
+                                    tenantId,
+                                    null,
+                                    senderEmail,
+                                    "OPEN",
+                                    null,
+                                    "IMAP-Verified",
+                                    "Confirmed Open via Inbound Reply"
+                            );
+                            eventRepository.save(openEvent);
+                            log.info("Auto-registered confirmed OPEN event for replying recipient: {}", senderEmail);
+                        }
+                    } catch (Exception ex) {
+                        log.debug("Could not auto-register confirmed OPEN event: {}", ex.getMessage());
+                    }
 
                     // Mark contact status as REPLIED
                     if (matchedContact != null) {
