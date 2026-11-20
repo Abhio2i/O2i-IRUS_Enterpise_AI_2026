@@ -2,8 +2,10 @@ package com.example.agentic_ai_platform.marketing.controller;
 
 import com.example.agentic_ai_platform.marketing.entity.MarketingCampaignEvent;
 import com.example.agentic_ai_platform.marketing.entity.MarketingCampaignReply;
+import com.example.agentic_ai_platform.marketing.entity.MarketingContact;
 import com.example.agentic_ai_platform.marketing.repository.MarketingCampaignEventRepository;
 import com.example.agentic_ai_platform.marketing.repository.MarketingCampaignReplyRepository;
+import com.example.agentic_ai_platform.marketing.repository.MarketingContactRepository;
 import com.example.agentic_ai_platform.marketing.service.EmailReplySyncService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -41,13 +43,16 @@ public class EmailTrackingController {
     private final MarketingCampaignEventRepository eventRepository;
     private final MarketingCampaignReplyRepository replyRepository;
     private final EmailReplySyncService replySyncService;
+    private final MarketingContactRepository contactRepository;
 
     public EmailTrackingController(MarketingCampaignEventRepository eventRepository,
                                    MarketingCampaignReplyRepository replyRepository,
-                                   EmailReplySyncService replySyncService) {
+                                   EmailReplySyncService replySyncService,
+                                   MarketingContactRepository contactRepository) {
         this.eventRepository = eventRepository;
         this.replyRepository = replyRepository;
         this.replySyncService = replySyncService;
+        this.contactRepository = contactRepository;
     }
 
     /**
@@ -194,13 +199,49 @@ public class EmailTrackingController {
     }
 
     /**
-     * 7. Authenticated: Recent tracking events (Opens & Clicks live stream)
+     * 7. Authenticated: Recent tracking events (Opens & Clicks live stream) enriched with company name
      */
     @GetMapping("/api/marketing/tracking/events")
-    public ResponseEntity<List<MarketingCampaignEvent>> getTrackingEvents(JwtAuthenticationToken auth) {
+    public ResponseEntity<List<Map<String, Object>>> getTrackingEvents(JwtAuthenticationToken auth) {
         UUID tenantId = tenantId(auth);
         List<MarketingCampaignEvent> events = eventRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
-        return ResponseEntity.ok(events);
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+
+        for (MarketingCampaignEvent evt : events) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", evt.getId());
+            map.put("tenantId", evt.getTenantId());
+            map.put("campaignId", evt.getCampaignId());
+            map.put("contactEmail", evt.getContactEmail());
+            map.put("eventType", evt.getEventType());
+            map.put("targetUrl", evt.getTargetUrl());
+            map.put("ipAddress", evt.getIpAddress());
+            map.put("userAgent", evt.getUserAgent());
+            map.put("createdAt", evt.getCreatedAt());
+
+            String company = null;
+            String contactName = null;
+            if (evt.getContactEmail() != null && !evt.getContactEmail().isBlank()) {
+                var opt = contactRepository.findByTenantIdAndEmail(tenantId, evt.getContactEmail().toLowerCase().trim());
+                if (opt.isPresent()) {
+                    MarketingContact mc = opt.get();
+                    company = mc.getCompany();
+                    contactName = ((mc.getFirstName() != null ? mc.getFirstName() : "") + " " + (mc.getLastName() != null ? mc.getLastName() : "")).trim();
+                }
+                if (company == null || company.isBlank()) {
+                    String email = evt.getContactEmail();
+                    if (email.contains("@")) {
+                        String domainPart = email.substring(email.indexOf("@") + 1).split("\\.")[0];
+                        company = Character.toUpperCase(domainPart.charAt(0)) + domainPart.substring(1);
+                    }
+                }
+            }
+            map.put("companyName", company != null ? company : "Company / Lead");
+            map.put("contactName", (contactName != null && !contactName.isBlank()) ? contactName : null);
+            result.add(map);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     private String decodeEmail(String encoded) {

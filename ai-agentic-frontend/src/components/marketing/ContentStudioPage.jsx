@@ -2431,7 +2431,7 @@ export const ContentStudioPage = () => {
                       flexWrap: 'wrap'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{
                         background: evt.eventType === 'OPEN' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
                         color: evt.eventType === 'OPEN' ? '#047857' : '#b45309',
@@ -2440,9 +2440,20 @@ export const ContentStudioPage = () => {
                         {evt.eventType === 'OPEN' ? <Eye size={12} /> : <MousePointer size={12} />}
                         {evt.eventType === 'OPEN' ? 'EMAIL OPENED' : 'LINK CLICKED'}
                       </span>
+                      <span style={{
+                        background: 'rgba(37,99,235,0.12)', color: '#2563eb',
+                        padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11
+                      }}>
+                        🏢 {evt.companyName || 'Company / Contact'}
+                      </span>
                       <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
-                        {evt.contactEmail || 'Recipient'}
+                        {evt.contactName || evt.contactEmail}
                       </strong>
+                      {evt.contactName && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          &lt;{evt.contactEmail}&gt;
+                        </span>
+                      )}
                       {evt.eventType === 'CLICK' && evt.targetUrl && (
                         <a
                           href={evt.targetUrl}
