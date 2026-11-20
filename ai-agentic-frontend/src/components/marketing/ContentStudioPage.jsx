@@ -144,6 +144,8 @@ export const ContentStudioPage = () => {
   const [isSyncingReplies, setIsSyncingReplies] = useState(false);
   const [selectedReply, setSelectedReply] = useState(null);
   const [replyFilter, setReplyFilter] = useState('ALL'); // 'ALL' | 'UNREAD'
+  const [showOriginalThread, setShowOriginalThread] = useState(false);
+  const [copiedReply, setCopiedReply] = useState(false);
 
   // Notices
   const [notice, setNotice] = useState('');
@@ -164,6 +166,33 @@ export const ContentStudioPage = () => {
       .split(/\n\s*\n/)
       .map(p => `<p>${p.trim().replace(/\n/g, '<br/>')}</p>`)
       .join('\n');
+  };
+
+  // Helper to cleanly separate recipient's reply from our previous outreach pitch / thread history
+  const splitEmailThread = (fullText) => {
+    if (!fullText) return { replyText: '', quotedText: '' };
+    const normalized = fullText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    const splitPatterns = [
+      /\n\s*(On\s+[\s\S]+?wrote:\s*[\s\S]*)/i,
+      /\n\s*(-{3,}\s*Original Message\s*-{3,}[\s\S]*)/i,
+      /\n\s*(From:\s+[^\n]+[\s\S]*?(?:Sent|Date):\s+[^\n]+[\s\S]*)/i,
+      /\n\s*([_\-]{8,}[\s\S]*)/,
+      /\n(\s*>[ \t]*[\s\S]*)/,
+    ];
+
+    for (const regex of splitPatterns) {
+      const match = normalized.match(regex);
+      if (match && match.index !== undefined && match.index >= 0) {
+        const replyPart = normalized.substring(0, match.index).trim();
+        const quotedPart = match[1].trim();
+        if (replyPart.length > 0) {
+          return { replyText: replyPart, quotedText: quotedPart };
+        }
+      }
+    }
+
+    return { replyText: normalized.trim(), quotedText: '' };
   };
 
   const handleVisualInput = () => {
@@ -2329,7 +2358,7 @@ export const ContentStudioPage = () => {
                     fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
                     background: 'var(--bg-hover)', padding: '8px 12px', borderRadius: 6
                   }}>
-                    {reply.snippet || '(No text preview available)'}
+                    {splitEmailThread(reply.bodyText || reply.snippet).replyText || reply.snippet || '(No text preview available)'}
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, flexWrap: 'wrap', gap: 8 }}>
@@ -2339,6 +2368,8 @@ export const ContentStudioPage = () => {
                         className="btn btn-xs btn-solid"
                         onClick={() => {
                           setSelectedReply(reply);
+                          setShowOriginalThread(false);
+                          setCopiedReply(false);
                           if (!reply.isRead) handleMarkReplyRead(reply.id);
                         }}
                         style={{ display: 'flex', alignItems: 'center', gap: 4 }}
@@ -2371,84 +2402,222 @@ export const ContentStudioPage = () => {
         </div>
       )}
 
-      {/* FULL REPLY MESSAGE MODAL */}
-      {selectedReply && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: 16, backdropFilter: 'blur(4px)'
-          }}
-          onClick={() => setSelectedReply(null)}
-        >
+      {/* FULL REPLY MESSAGE MODAL - CLEARLY SPLIT BETWEEN THEIR REPLY & OUR ORIGINAL PITCH */}
+      {selectedReply && (() => {
+        const { replyText, quotedText } = splitEmailThread(selectedReply.bodyText || selectedReply.snippet);
+        return (
           <div
             style={{
-              background: 'var(--bg-elevated)', borderRadius: 12,
-              border: '1px solid var(--border-default)', maxWidth: 640, width: '100%',
-              padding: 22, maxHeight: '85vh', display: 'flex', flexDirection: 'column'
+              position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 9999, padding: 16, backdropFilter: 'blur(5px)'
             }}
-            onClick={e => e.stopPropagation()}
+            onClick={() => { setSelectedReply(null); setShowOriginalThread(false); setCopiedReply(false); }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10 }}>
-              <div>
-                <span style={{
-                  background: 'rgba(16,185,129,0.15)', color: '#047857',
-                  padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11, display: 'inline-block', marginBottom: 4
-                }}>
-                  🏢 {selectedReply.schoolName || 'Company / Contact'}
-                </span>
-                <h3 style={{ margin: '4px 0 2px', fontSize: 16, fontWeight: 700 }}>
-                  {selectedReply.subject || 'No Subject'}
-                </h3>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  From: <strong>{selectedReply.senderName || selectedReply.senderEmail}</strong> &lt;{selectedReply.senderEmail}&gt;
+            <div
+              style={{
+                background: 'var(--bg-elevated)', borderRadius: 14,
+                border: '1px solid var(--border-default)', maxWidth: 680, width: '100%',
+                padding: 24, maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+                boxShadow: '0 20px 45px rgba(0,0,0,0.35)'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{
+                      background: 'rgba(16,185,129,0.15)', color: '#047857',
+                      padding: '3px 10px', borderRadius: 6, fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5
+                    }}>
+                      🏢 {selectedReply.schoolName || 'Company / Contact'}
+                    </span>
+                    <span style={{
+                      background: 'rgba(37,99,235,0.12)', color: '#2563eb',
+                      padding: '3px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4
+                    }}>
+                      📥 Inbound Response
+                    </span>
+                  </div>
+                  <h3 style={{ margin: '6px 0 2px', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {selectedReply.subject || 'No Subject'}
+                  </h3>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                    From: <strong style={{ color: 'var(--text-primary)' }}>{selectedReply.senderName || selectedReply.senderEmail}</strong> &lt;{selectedReply.senderEmail}&gt;
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                    Received: {new Date(selectedReply.receivedAt).toLocaleString()}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Received: {new Date(selectedReply.receivedAt).toLocaleString()}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs"
-                onClick={() => setSelectedReply(null)}
-                style={{ fontSize: 16, lineHeight: 1 }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{
-              flex: 1, overflowY: 'auto', padding: '14px 16px', background: 'var(--bg-hover)',
-              borderRadius: 8, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-primary)',
-              fontFamily: 'inherit', border: '1px solid var(--border-subtle)'
-            }}>
-              {selectedReply.bodyText || selectedReply.snippet || '(No message text)'}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Message-ID: <code>{selectedReply.messageId ? selectedReply.messageId.substring(0, 30) + '...' : 'N/A'}</code>
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <a
-                  href={`mailto:${encodeURIComponent(selectedReply.senderEmail)}?subject=${encodeURIComponent('Re: ' + (selectedReply.subject || ''))}`}
-                  className="btn btn-sm btn-solid"
-                  style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', textDecoration: 'none' }}
-                >
-                  <Mail size={12} /> Reply via Email
-                </a>
                 <button
                   type="button"
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => setSelectedReply(null)}
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => { setSelectedReply(null); setShowOriginalThread(false); setCopiedReply(false); }}
+                  style={{ fontSize: 18, lineHeight: 1, padding: '4px 8px' }}
                 >
-                  Close
+                  ✕
                 </button>
+              </div>
+
+              {/* Scrollable Body */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, paddingRight: 4 }}>
+                
+                {/* 🟢 CARD 1: RECIPIENT'S REPLY (UNKA REPLY) */}
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.06)',
+                  border: '1.5px solid rgba(16, 185, 129, 0.35)',
+                  borderLeft: '5px solid #10b981',
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.05)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid rgba(16, 185, 129, 0.2)', paddingBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#047857', fontWeight: 800, fontSize: 12.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <span>💬</span>
+                      <span>Unka Reply (Recipient's Response)</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>
+                      Latest Incoming Message
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: 13.5,
+                    lineHeight: 1.65,
+                    whiteSpace: 'pre-wrap',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'inherit',
+                    wordBreak: 'break-word'
+                  }}>
+                    {replyText || selectedReply.bodyText || '(No reply message text)'}
+                  </div>
+                </div>
+
+                {/* ⚪ CARD 2: OUR ORIGINAL OUTREACH / PREVIOUS THREAD (HAMARA BHEJA GAYA EMAIL) */}
+                {quotedText ? (
+                  <div style={{
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-default)',
+                    borderLeft: '4px solid var(--text-muted)',
+                    borderRadius: 10,
+                    padding: '12px 16px'
+                  }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                      onClick={() => setShowOriginalThread(prev => !prev)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        <span>📜</span>
+                        <span>Hamara Bheja Gaya Email (Our Original Pitch / Thread History)</span>
+                      </div>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          fontSize: 11.5,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontWeight: 600
+                        }}
+                      >
+                        {showOriginalThread ? 'Hide Pitch ▲' : 'Show Original Pitch ▼'}
+                      </button>
+                    </div>
+
+                    {showOriginalThread && (
+                      <div style={{
+                        marginTop: 10,
+                        paddingTop: 10,
+                        borderTop: '1px dashed var(--border-subtle)',
+                        fontSize: 12.5,
+                        lineHeight: 1.6,
+                        whiteSpace: 'pre-wrap',
+                        color: 'var(--text-muted)',
+                        fontFamily: 'inherit',
+                        maxHeight: 260,
+                        overflowY: 'auto',
+                        wordBreak: 'break-word'
+                      }}>
+                        {quotedText}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{
+                    background: 'var(--bg-hover)',
+                    border: '1px dashed var(--border-subtle)',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    fontSize: 11.5,
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>ℹ️</span>
+                    <span>This email was received as a direct message without quoted previous pitch history.</span>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: 16,
+                paddingTop: 12,
+                borderTop: '1px solid var(--border-subtle)',
+                flexWrap: 'wrap',
+                gap: 10
+              }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Message-ID: <code style={{ fontSize: 10.5 }}>{selectedReply.messageId ? selectedReply.messageId.substring(0, 32) + '...' : 'N/A'}</code>
+                </span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(replyText || selectedReply.bodyText || '');
+                      setCopiedReply(true);
+                      setTimeout(() => setCopiedReply(false), 2000);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                  >
+                    {copiedReply ? '✓ Copied!' : '📋 Copy Response'}
+                  </button>
+                  <a
+                    href={`mailto:${encodeURIComponent(selectedReply.senderEmail)}?subject=${encodeURIComponent('Re: ' + (selectedReply.subject || ''))}`}
+                    className="btn btn-sm btn-solid"
+                    style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Mail size={13} /> Reply via Email
+                  </a>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => { setSelectedReply(null); setShowOriginalThread(false); setCopiedReply(false); }}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* SAVE TEMPLATE MODAL */}
       {showSaveTemplateModal && (

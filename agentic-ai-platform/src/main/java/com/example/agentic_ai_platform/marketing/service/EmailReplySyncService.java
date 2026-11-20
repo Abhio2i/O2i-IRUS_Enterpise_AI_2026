@@ -167,7 +167,11 @@ public class EmailReplySyncService {
 
                     String subject = msg.getSubject() != null ? msg.getSubject() : "No Subject";
                     String body = extractBodyText(msg);
-                    String snippet = body.length() > 240 ? body.substring(0, 240) + "..." : body;
+                    String cleanReply = extractCleanReply(body);
+                    String snippet = cleanReply.length() > 240 ? cleanReply.substring(0, 240) + "..." : cleanReply;
+                    if (snippet.isBlank()) {
+                        snippet = body.length() > 240 ? body.substring(0, 240) + "..." : body;
+                    }
 
                     Instant receivedAt = msg.getReceivedDate() != null ? msg.getReceivedDate().toInstant() :
                             (msg.getSentDate() != null ? msg.getSentDate().toInstant() : Instant.now());
@@ -248,5 +252,28 @@ public class EmailReplySyncService {
             return sb.toString().trim();
         }
         return "";
+    }
+
+    private String extractCleanReply(String fullText) {
+        if (fullText == null || fullText.isBlank()) return "";
+        String normalized = fullText.replace("\r\n", "\n").replace("\r", "\n");
+        String[] patterns = new String[] {
+            "(?i)\\n\\s*On\\s+.+?\\bwrote:\\s*",
+            "(?i)\\n\\s*-{3,}\\s*Original Message\\s*-{3,}",
+            "(?i)\\n\\s*From:\\s+.+?\\n(?:Sent|Date):\\s+",
+            "(?i)\\n\\s*_{8,}",
+            "(?i)\\n\\s*-{8,}",
+            "(?i)\\n\\s*>\\s*"
+        };
+        for (String pat : patterns) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(pat).matcher(normalized);
+            if (m.find() && m.start() > 0) {
+                String reply = normalized.substring(0, m.start()).trim();
+                if (!reply.isBlank()) {
+                    return reply;
+                }
+            }
+        }
+        return normalized.trim();
     }
 }
