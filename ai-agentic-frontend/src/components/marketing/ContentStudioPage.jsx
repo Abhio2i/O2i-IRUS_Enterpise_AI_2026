@@ -2162,7 +2162,7 @@ export const ContentStudioPage = () => {
                 <Inbox size={18} color="var(--brand-primary, #2563eb)" /> Inbound Replies & Engagement Tracking
               </h3>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-                Real-time tracking of recipient opens, link clicks, and school responses synchronized directly from GoDaddy IMAP (<code>ab2@o2i.tech</code>).
+                Real-time tracking of recipient opens, link clicks, and inbound responses from ALL recipients (enterprise clients, leads, and schools) synchronized directly from GoDaddy IMAP (<code>ab2@o2i.tech</code>).
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2269,10 +2269,10 @@ export const ContentStudioPage = () => {
                   <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
                     <Inbox size={32} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
                     <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 4 }}>
-                      {replyFilter === 'UNREAD' ? 'No unread replies' : 'No incoming school responses found yet'}
+                      {replyFilter === 'UNREAD' ? 'No unread replies' : 'No incoming email responses found yet'}
                     </div>
                     <div>
-                      When schools or contacts reply to your emails, their messages will appear here automatically.
+                      When any recipient (enterprise company, lead, client, or school) replies to your email, their message will appear here automatically.
                       Click <strong>"Sync Replies Now"</strong> above to check your GoDaddy mailbox.
                     </div>
                   </div>
@@ -2307,7 +2307,7 @@ export const ContentStudioPage = () => {
                         background: 'rgba(16,185,129,0.15)', color: '#047857',
                         padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11
                       }}>
-                        🏫 {reply.schoolName || 'Partner School'}
+                        🏢 {reply.schoolName || 'Company / Contact'}
                       </span>
                       <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                         {reply.senderName || reply.senderEmail}
@@ -2395,7 +2395,7 @@ export const ContentStudioPage = () => {
                   background: 'rgba(16,185,129,0.15)', color: '#047857',
                   padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11, display: 'inline-block', marginBottom: 4
                 }}>
-                  🏫 {selectedReply.schoolName || 'School'}
+                  🏢 {selectedReply.schoolName || 'Company / Contact'}
                 </span>
                 <h3 style={{ margin: '4px 0 2px', fontSize: 16, fontWeight: 700 }}>
                   {selectedReply.subject || 'No Subject'}
