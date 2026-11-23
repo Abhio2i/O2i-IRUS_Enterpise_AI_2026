@@ -151,6 +151,16 @@ export const ContentStudioPage = () => {
   const [activeTrackingView, setActiveTrackingView] = useState('REPLIES'); // 'REPLIES' | 'EVENTS'
   const [eventFilter, setEventFilter] = useState('ALL'); // 'ALL' | 'OPEN' | 'CLICK'
 
+  // In-App Email Reply Composer State
+  const [replyComposerOpen, setReplyComposerOpen] = useState(false);
+  const [replyTarget, setReplyTarget] = useState(null);
+  const [replySubject, setReplySubject] = useState('');
+  const [replyBody, setReplyBody] = useState('');
+  const [replySenderFrom, setReplySenderFrom] = useState('');
+  const [replyAttachments, setReplyAttachments] = useState([]);
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [showReplyThreadPreview, setShowReplyThreadPreview] = useState(false);
+
   // Notices
   const [notice, setNotice] = useState('');
   const [noticeType, setNoticeType] = useState('success');
@@ -170,6 +180,16 @@ export const ContentStudioPage = () => {
       .split(/\n\s*\n/)
       .map(p => `<p>${p.trim().replace(/\n/g, '<br/>')}</p>`)
       .join('\n');
+  };
+
+  const escapeHtml = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   };
 
   // Helper to cleanly separate recipient's reply from our previous outreach pitch / thread history
@@ -443,6 +463,112 @@ export const ContentStudioPage = () => {
       setTrackingSummary(prev => ({ ...prev, unreadReplies: Math.max(0, (prev.unreadReplies || 1) - 1) }));
     } catch (err) {
       console.warn('Failed to mark reply as read:', err);
+    }
+  };
+
+  const handleOpenReplyComposer = (reply) => {
+    if (!reply) return;
+    setReplyTarget(reply);
+    const origSubj = reply.subject || '';
+    const cleanSubj = origSubj.trim().toLowerCase().startsWith('re:') ? origSubj.trim() : `Re: ${origSubj.trim() || 'Your message'}`;
+    setReplySubject(cleanSubj);
+    setReplySenderFrom(fromEmail || defaultSender || 'ab2@o2i.tech');
+    setReplyAttachments([]);
+    setShowReplyThreadPreview(false);
+
+    const contactName = reply.senderName || reply.senderEmail?.split('@')[0] || 'there';
+    setReplyBody(`Hi ${contactName},\n\nThank you for getting back to us.\n\nBest regards,\n${senderName || 'Oxygen to Innovation Team'}`);
+
+    setSelectedReply(null);
+    setReplyComposerOpen(true);
+  };
+
+  const handleApplyReplyTemplate = (templateType) => {
+    if (!replyTarget) return;
+    const name = replyTarget.senderName || replyTarget.senderEmail?.split('@')[0] || 'there';
+    const company = replyTarget.schoolName || 'your organization';
+    const myName = senderName || 'Oxygen to Innovation Team';
+
+    if (templateType === 'MEETING') {
+      setReplyBody(`Hi ${name},\n\nThank you for reaching out! I would love to connect for a quick 15-minute alignment call regarding our agentic AI platform for ${company}.\n\nAre you available on Thursday or Friday afternoon? Alternatively, feel free to suggest a date and time that suits your schedule.\n\nLooking forward to speaking soon.\n\nBest regards,\n${myName}`);
+    } else if (templateType === 'PROPOSAL') {
+      setReplyBody(`Hi ${name},\n\nThank you for your interest! I have attached our detailed architecture roadmap and enterprise transformation overview for ${company}.\n\nPlease let me know if you would like us to clarify any specific technical milestones or compliance criteria.\n\nBest regards,\n${myName}`);
+    } else if (templateType === 'CONFIRM') {
+      setReplyBody(`Hi ${name},\n\nReceived and noted with thanks! We are preparing the requested information and will update you shortly.\n\nPlease don't hesitate to reach out if you have any immediate questions in the meantime.\n\nBest regards,\n${myName}`);
+    } else if (templateType === 'CLEAR') {
+      setReplyBody('');
+    }
+  };
+
+  const handleSendReplySubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!replyTarget || !replyTarget.senderEmail) {
+      showFeedback('No recipient email specified for reply.', 'error');
+      return;
+    }
+    if (!replySubject.trim()) {
+      showFeedback('Please provide an email subject for your reply.', 'error');
+      return;
+    }
+    if (!replyBody.trim()) {
+      showFeedback('Please write your reply message before sending.', 'error');
+      return;
+    }
+
+    setIsSendingReply(true);
+    try {
+      const { replyText } = splitEmailThread(replyTarget.bodyText || replyTarget.snippet);
+      const originalHistory = replyText || replyTarget.snippet || replyTarget.bodyText || '';
+      const replyDate = replyTarget.receivedAt ? new Date(replyTarget.receivedAt).toLocaleString() : 'recently';
+      const senderDisplay = replyTarget.senderName
+        ? `${replyTarget.senderName} &lt;${replyTarget.senderEmail}&gt;`
+        : replyTarget.senderEmail;
+
+      const formattedHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14.5px; line-height: 1.6; color: #1e293b;">
+          ${replyBody.trim().split('\n').map(p => p.trim() ? `<p style="margin: 0 0 12px 0;">${escapeHtml(p)}</p>` : `<br/>`).join('')}
+          <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #e2e8f0; border-left: 3px solid #cbd5e1; padding-left: 14px; color: #64748b; font-size: 13px;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">
+              On ${replyDate}, ${senderDisplay} wrote:
+            </p>
+            <div style="white-space: pre-wrap; font-family: inherit;">
+              ${escapeHtml(originalHistory)}
+            </div>
+          </div>
+        </div>
+      `.trim();
+
+      const effectiveFrom = replySenderFrom.trim() || fromEmail.trim() || defaultSender || 'ab2@o2i.tech';
+      const effectiveSenderName = senderName || 'Oxygen to Innovation';
+
+      await sendBulkCampaign({
+        campaignName: `Direct Reply: ${replySubject.trim()}`,
+        directEmail: replyTarget.senderEmail.trim(),
+        directFirstName: replyTarget.senderName || '',
+        directCompany: replyTarget.schoolName || '',
+        subject: replySubject.trim(),
+        contentHtml: formattedHtml,
+        fromEmail: effectiveFrom,
+        senderName: effectiveSenderName,
+        replyTo: replyTo || effectiveFrom,
+        inReplyTo: replyTarget.messageId || undefined,
+        attachments: replyAttachments,
+      });
+
+      showFeedback(`Reply sent successfully to ${replyTarget.senderEmail}!`, 'success');
+
+      if (!replyTarget.isRead) {
+        handleMarkReplyRead(replyTarget.id);
+      }
+
+      setReplyComposerOpen(false);
+      setReplyTarget(null);
+      setReplyBody('');
+      setReplyAttachments([]);
+    } catch (err) {
+      showFeedback(`Failed to send reply: ${err.message}`, 'error');
+    } finally {
+      setIsSendingReply(false);
     }
   };
 
@@ -2577,13 +2703,14 @@ export const ContentStudioPage = () => {
                       >
                         <Eye size={11} /> Read Full Message
                       </button>
-                      <a
-                        href={`mailto:${encodeURIComponent(reply.senderEmail)}?subject=${encodeURIComponent('Re: ' + (reply.subject || ''))}`}
-                        className="btn btn-xs btn-ghost"
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReplyComposer(reply)}
+                        className="btn btn-xs btn-outline"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, borderColor: '#2563eb', color: '#2563eb', fontWeight: 600 }}
                       >
-                        <Mail size={11} /> Reply via Email
-                      </a>
+                        <Mail size={11} /> Reply This Mail
+                      </button>
                     </div>
                     {!reply.isRead && (
                       <button
@@ -2800,13 +2927,14 @@ export const ContentStudioPage = () => {
                   >
                     {copiedReply ? '✓ Copied!' : '📋 Copy Response'}
                   </button>
-                  <a
-                    href={`mailto:${encodeURIComponent(selectedReply.senderEmail)}?subject=${encodeURIComponent('Re: ' + (selectedReply.subject || ''))}`}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenReplyComposer(selectedReply)}
                     className="btn btn-sm btn-solid"
-                    style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: 'var(--brand-primary, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
                   >
-                    <Mail size={13} /> Reply via Email
-                  </a>
+                    <Mail size={13} /> Reply This Mail
+                  </button>
                   <button
                     type="button"
                     className="btn btn-sm btn-ghost"
@@ -2820,6 +2948,394 @@ export const ContentStudioPage = () => {
           </div>
         );
       })()}
+
+      {/* IN-APP EMAIL REPLY COMPOSER MODAL - SENDS REPLIES DIRECTLY WITHIN THE PLATFORM */}
+      {replyComposerOpen && replyTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => { if (!isSendingReply) setReplyComposerOpen(false); }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-elevated)',
+              borderRadius: 14,
+              border: '1px solid var(--border-default)',
+              maxWidth: 720,
+              width: '100%',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px -15px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'var(--bg-surface, var(--bg-elevated))',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: 'rgba(37, 99, 235, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#2563eb',
+                  }}
+                >
+                  <Mail size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Reply to {replyTarget.senderName || replyTarget.senderEmail}
+                  </h3>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      In-app direct reply via SMTP (ab2@o2i.tech)
+                    </span>
+                    {replyTarget.schoolName && (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          padding: '1px 7px',
+                          background: 'rgba(37,99,235,0.08)',
+                          color: '#2563eb',
+                          borderRadius: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        🏢 {replyTarget.schoolName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                onClick={() => { if (!isSendingReply) setReplyComposerOpen(false); }}
+                style={{ padding: '4px 8px', borderRadius: 6 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body / Composer Form */}
+            <div style={{ padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Recipient & Sender Strip */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 4 }}>
+                    To (Recipient)
+                  </label>
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      background: 'var(--bg-subtle, rgba(0,0,0,0.03))',
+                      borderRadius: 6,
+                      border: '1px solid var(--border-subtle)',
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>{replyTarget.senderEmail}</span>
+                    {replyTarget.senderName && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({replyTarget.senderName})</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 4 }}>
+                    From (Sending Account)
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={replySenderFrom}
+                    onChange={e => setReplySenderFrom(e.target.value)}
+                    placeholder="ab2@o2i.tech"
+                    style={{ fontSize: 12.5, padding: '7px 10px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 4 }}>
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={replySubject}
+                  onChange={e => setReplySubject(e.target.value)}
+                  placeholder="Re: Subject"
+                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 12px' }}
+                />
+              </div>
+
+              {/* Quoted Message Reference Accordion */}
+              <div
+                style={{
+                  background: 'var(--bg-surface, var(--bg-card))',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-subtle)',
+                  padding: '8px 12px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setShowReplyThreadPreview(!showReplyThreadPreview)}
+                >
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>
+                    💬 Replying to Message History {showReplyThreadPreview ? '▲' : '▼'}
+                  </span>
+                  <span style={{ fontSize: 10.5, color: '#2563eb' }}>
+                    {showReplyThreadPreview ? 'Hide original message' : 'Preview message'}
+                  </span>
+                </div>
+                {showReplyThreadPreview && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: 10,
+                      background: 'var(--bg-elevated)',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      color: 'var(--text-secondary)',
+                      maxHeight: 140,
+                      overflowY: 'auto',
+                      borderLeft: '3px solid #2563eb',
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {splitEmailThread(replyTarget.bodyText || replyTarget.snippet).replyText || replyTarget.snippet || replyTarget.bodyText || 'No text'}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Response Templates / AI Snippets */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Sparkles size={12} color="#2563eb" /> Quick Templates & Snippets
+                  </label>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Click to auto-populate response</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => handleApplyReplyTemplate('MEETING')}
+                    style={{ fontSize: 11, borderRadius: 6 }}
+                  >
+                    📅 Propose 15-Min Call
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => handleApplyReplyTemplate('PROPOSAL')}
+                    style={{ fontSize: 11, borderRadius: 6 }}
+                  >
+                    📄 Share Architecture Proposal
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => handleApplyReplyTemplate('CONFIRM')}
+                    style={{ fontSize: 11, borderRadius: 6 }}
+                  >
+                    🙏 Confirm & Note Requirements
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-ghost"
+                    onClick={() => handleApplyReplyTemplate('CLEAR')}
+                    style={{ fontSize: 11, borderRadius: 6, color: 'var(--text-muted)' }}
+                  >
+                    🧹 Clear
+                  </button>
+                </div>
+              </div>
+
+              {/* Message Body */}
+              <div>
+                <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 4 }}>
+                  Reply Message Body
+                </label>
+                <textarea
+                  className="form-control"
+                  rows={7}
+                  value={replyBody}
+                  onChange={e => setReplyBody(e.target.value)}
+                  placeholder="Type your message here..."
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    padding: '10px 12px',
+                    fontFamily: 'inherit',
+                    borderRadius: 8,
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Attachments */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: '5px 10px',
+                      background: 'var(--bg-surface)',
+                      borderRadius: 6,
+                      border: '1px solid var(--border-default)',
+                    }}
+                  >
+                    <Paperclip size={13} />
+                    Attach Files
+                    <input
+                      type="file"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        if (e.target.files) {
+                          setReplyAttachments(prev => [...prev, ...Array.from(e.target.files)]);
+                        }
+                      }}
+                    />
+                  </label>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    PDF, DOCX, ZIP, or proposals (max 25MB total)
+                  </span>
+                </div>
+
+                {replyAttachments.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {replyAttachments.map((f, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          fontSize: 11,
+                          padding: '3px 8px',
+                          background: 'var(--bg-subtle)',
+                          borderRadius: 6,
+                          border: '1px solid var(--border-subtle)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        📄 {f.name} ({(f.size / 1024).toFixed(0)} KB)
+                        <button
+                          type="button"
+                          onClick={() => setReplyAttachments(prev => prev.filter((_, i) => i !== idx))}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            color: '#ef4444',
+                            padding: 0,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid var(--border-subtle)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 10,
+                background: 'var(--bg-surface, var(--bg-elevated))',
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setReplyComposerOpen(false)}
+                disabled={isSendingReply}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-solid"
+                onClick={handleSendReplySubmit}
+                disabled={isSendingReply}
+                style={{
+                  background: 'var(--brand-primary, #2563eb)',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 600,
+                  padding: '7px 16px',
+                }}
+              >
+                {isSendingReply ? (
+                  <>
+                    <RefreshCw size={13} className="spin" />
+                    Sending Reply via SMTP...
+                  </>
+                ) : (
+                  <>
+                    <Send size={13} />
+                    Send Reply Now
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SAVE TEMPLATE MODAL */}
       {showSaveTemplateModal && (

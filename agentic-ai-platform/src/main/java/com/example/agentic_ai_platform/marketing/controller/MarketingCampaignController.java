@@ -159,6 +159,7 @@ public class MarketingCampaignController {
             @RequestParam String subject, @RequestParam String contentHtml,
             @RequestParam(required = false) String fromEmail, @RequestParam(required = false) String senderName,
             @RequestParam(required = false) String replyTo,
+            @RequestParam(required = false) String inReplyTo,
             @RequestParam(required = false) String cc,
             @RequestParam(required = false) String bcc,
             @RequestParam(required = false) List<String> variables,
@@ -266,6 +267,13 @@ public class MarketingCampaignController {
                 helper.setText(trackedHtml, true);
                 message.setHeader("Message-ID", "<cmp-" + campaignId + "-" + Math.abs(contact.email().hashCode()) + "@" + (effectiveFrom.contains("@") ? effectiveFrom.split("@")[1] : "o2i.tech") + ">");
                 if (request.replyTo() != null && !request.replyTo().isBlank()) helper.setReplyTo(request.replyTo());
+                if (inReplyTo != null && !inReplyTo.isBlank()) {
+                    String cleanId = inReplyTo.trim();
+                    if (!cleanId.startsWith("<")) cleanId = "<" + cleanId;
+                    if (!cleanId.endsWith(">")) cleanId = cleanId + ">";
+                    message.setHeader("In-Reply-To", cleanId);
+                    message.setHeader("References", cleanId);
+                }
                 for (CampaignAttachment att : emailAttachments) {
                     helper.addAttachment(att.filename(), new ByteArrayResource(att.data()), att.contentType());
                 }

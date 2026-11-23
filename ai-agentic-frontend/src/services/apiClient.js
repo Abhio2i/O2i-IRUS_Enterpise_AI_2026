@@ -1447,6 +1447,7 @@ export async function sendBulkCampaign({
   fromEmail = '',
   senderName = 'Oxygen to Innovation',
   replyTo = 'ab2@o2i.tech',
+  inReplyTo = '',
   cc = '',
   bcc = '',
   variables = ['firstName', 'lastName', 'company', 'senderName', 'email'],
@@ -1470,6 +1471,7 @@ export async function sendBulkCampaign({
   if (fromEmail) formData.append('fromEmail', fromEmail);
   if (senderName) formData.append('senderName', senderName);
   if (replyTo) formData.append('replyTo', replyTo);
+  if (inReplyTo && inReplyTo.trim()) formData.append('inReplyTo', inReplyTo.trim());
   if (cc && cc.trim()) formData.append('cc', cc.trim());
   if (bcc && bcc.trim()) formData.append('bcc', bcc.trim());
 
