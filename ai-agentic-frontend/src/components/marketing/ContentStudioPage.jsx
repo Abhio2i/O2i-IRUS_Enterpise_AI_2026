@@ -158,6 +158,9 @@ export const ContentStudioPage = () => {
   const [replyBody, setReplyBody] = useState('');
   const [replySenderFrom, setReplySenderFrom] = useState('');
   const [replyAttachments, setReplyAttachments] = useState([]);
+  const [replyCc, setReplyCc] = useState('');
+  const [replyBcc, setReplyBcc] = useState('');
+  const [showBccField, setShowBccField] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [showReplyThreadPreview, setShowReplyThreadPreview] = useState(false);
   const [activeInlineReplyId, setActiveInlineReplyId] = useState(null);
@@ -506,6 +509,9 @@ export const ContentStudioPage = () => {
       const cleanSubj = origSubj.trim().toLowerCase().startsWith('re:') ? origSubj.trim() : `Re: ${origSubj.trim() || 'Your message'}`;
       setReplySubject(cleanSubj);
       setReplySenderFrom(fromEmail || defaultSender || 'ab2@o2i.tech');
+      setReplyCc('');
+      setReplyBcc('');
+      setShowBccField(false);
       setReplyAttachments([]);
       const firstName = formatContactGreeting(reply.senderName, reply.senderEmail);
       setReplyBody(`Hi ${firstName},\n\nThank you for getting back to us.\n\nBest regards,\n${senderName || 'Oxygen to Innovation Team'}`);
@@ -519,6 +525,9 @@ export const ContentStudioPage = () => {
     const cleanSubj = origSubj.trim().toLowerCase().startsWith('re:') ? origSubj.trim() : `Re: ${origSubj.trim() || 'Your message'}`;
     setReplySubject(cleanSubj);
     setReplySenderFrom(fromEmail || defaultSender || 'ab2@o2i.tech');
+    setReplyCc('');
+    setReplyBcc('');
+    setShowBccField(false);
     setReplyAttachments([]);
     setShowReplyThreadPreview(false);
 
@@ -527,23 +536,6 @@ export const ContentStudioPage = () => {
 
     setSelectedReply(null);
     setReplyComposerOpen(true);
-  };
-
-  const handleApplyReplyTemplate = (templateType) => {
-    if (!replyTarget) return;
-    const firstName = formatContactGreeting(replyTarget.senderName, replyTarget.senderEmail);
-    const company = replyTarget.schoolName || 'your organization';
-    const myName = senderName || 'Oxygen to Innovation Team';
-
-    if (templateType === 'MEETING') {
-      setReplyBody(`Hi ${firstName},\n\nThank you for reaching out! I would love to connect for a quick 15-minute alignment call regarding our agentic AI platform for ${company}.\n\nAre you available on Thursday or Friday afternoon? Alternatively, feel free to suggest a date and time that suits your schedule.\n\nLooking forward to speaking soon.\n\nBest regards,\n${myName}`);
-    } else if (templateType === 'PROPOSAL') {
-      setReplyBody(`Hi ${firstName},\n\nThank you for your interest! I have attached our detailed architecture roadmap and enterprise transformation overview for ${company}.\n\nPlease let me know if you would like us to clarify any specific technical milestones or compliance criteria.\n\nBest regards,\n${myName}`);
-    } else if (templateType === 'CONFIRM') {
-      setReplyBody(`Hi ${firstName},\n\nReceived and noted with thanks! We are preparing the requested information and will update you shortly.\n\nPlease don't hesitate to reach out if you have any immediate questions in the meantime.\n\nBest regards,\n${myName}`);
-    } else if (templateType === 'CLEAR') {
-      setReplyBody('');
-    }
   };
 
   const handleSendReplySubmit = async (e) => {
@@ -598,6 +590,8 @@ export const ContentStudioPage = () => {
         senderName: effectiveSenderName,
         replyTo: replyTo || effectiveFrom,
         inReplyTo: replyTarget.messageId || undefined,
+        cc: replyCc.trim() || undefined,
+        bcc: replyBcc.trim() || undefined,
         attachments: replyAttachments,
       });
 
@@ -611,6 +605,9 @@ export const ContentStudioPage = () => {
       setActiveInlineReplyId(null);
       setReplyTarget(null);
       setReplyBody('');
+      setReplyCc('');
+      setReplyBcc('');
+      setShowBccField(false);
       setReplyAttachments([]);
     } catch (err) {
       showFeedback(`Failed to send reply: ${err.message}`, 'error');
@@ -2844,10 +2841,10 @@ export const ContentStudioPage = () => {
                         </button>
                       </div>
 
-                      {/* From Account & Subject Row */}
-                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ flex: '0 0 240px', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>From Account</label>
+                      {/* From Account, CC & Subject */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 2fr', gap: 12, width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>From (Sending Account)</label>
                           <input
                             type="text"
                             value={replySenderFrom}
@@ -2866,13 +2863,24 @@ export const ContentStudioPage = () => {
                             }}
                           />
                         </div>
-                        <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>Subject</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>CC (Carbon Copy)</label>
+                            {!showBccField && (
+                              <button
+                                type="button"
+                                onClick={() => setShowBccField(true)}
+                                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                              >
+                                + Add BCC
+                              </button>
+                            )}
+                          </div>
                           <input
                             type="text"
-                            value={replySubject}
-                            onChange={e => setReplySubject(e.target.value)}
-                            placeholder="Re: Subject"
+                            value={replyCc}
+                            onChange={e => setReplyCc(e.target.value)}
+                            placeholder="colleague@domain.com, team@domain.com (comma separated)"
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
@@ -2881,7 +2889,6 @@ export const ContentStudioPage = () => {
                               borderRadius: 6,
                               padding: '8px 12px',
                               fontSize: 12.5,
-                              fontWeight: 600,
                               color: 'var(--text-primary)',
                               outline: 'none',
                             }}
@@ -2889,43 +2896,60 @@ export const ContentStudioPage = () => {
                         </div>
                       </div>
 
-                      {/* Quick 1-click templates */}
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, marginRight: 2 }}>
-                          <Sparkles size={12} color="#2563eb" /> Quick:
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline"
-                          onClick={() => handleApplyReplyTemplate('MEETING')}
-                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 14, background: 'var(--bg-hover)' }}
-                        >
-                          📅 Propose 15-Min Call
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline"
-                          onClick={() => handleApplyReplyTemplate('PROPOSAL')}
-                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 14, background: 'var(--bg-hover)' }}
-                        >
-                          📄 Share Architecture Proposal
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline"
-                          onClick={() => handleApplyReplyTemplate('CONFIRM')}
-                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 14, background: 'var(--bg-hover)' }}
-                        >
-                          🙏 Confirm & Note
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-ghost"
-                          onClick={() => handleApplyReplyTemplate('CLEAR')}
-                          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 14, color: 'var(--text-muted)' }}
-                        >
-                          🧹 Clear
-                        </button>
+                      {/* Optional BCC Row */}
+                      {showBccField && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', boxSizing: 'border-box' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>BCC (Blind Carbon Copy)</label>
+                            <button
+                              type="button"
+                              onClick={() => { setShowBccField(false); setReplyBcc(''); }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', padding: 0 }}
+                            >
+                              ✕ Remove BCC
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={replyBcc}
+                            onChange={e => setReplyBcc(e.target.value)}
+                            placeholder="bcc@domain.com (comma separated)"
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              background: 'var(--bg-input)',
+                              border: '1px solid var(--border-default)',
+                              borderRadius: 6,
+                              padding: '8px 12px',
+                              fontSize: 12.5,
+                              color: 'var(--text-primary)',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Subject */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', boxSizing: 'border-box' }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>Subject</label>
+                        <input
+                          type="text"
+                          value={replySubject}
+                          onChange={e => setReplySubject(e.target.value)}
+                          placeholder="Re: Subject"
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            background: 'var(--bg-input)',
+                            border: '1px solid var(--border-default)',
+                            borderRadius: 6,
+                            padding: '8px 12px',
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                          }}
+                        />
                       </div>
 
                       {/* Reply Message Textarea - FULL WIDTH */}
@@ -3385,14 +3409,92 @@ export const ContentStudioPage = () => {
                   </label>
                   <input
                     type="text"
-                    className="form-control"
                     value={replySenderFrom}
                     onChange={e => setReplySenderFrom(e.target.value)}
                     placeholder="ab2@o2i.tech"
-                    style={{ fontSize: 12.5, padding: '7px 10px' }}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 12.5,
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                    }}
                   />
                 </div>
               </div>
+
+              {/* CC & BCC Row */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 0 }}>
+                    CC (Carbon Copy)
+                  </label>
+                  {!showBccField && (
+                    <button
+                      type="button"
+                      onClick={() => setShowBccField(true)}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    >
+                      + Add BCC
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={replyCc}
+                  onChange={e => setReplyCc(e.target.value)}
+                  placeholder="colleague@domain.com, team@domain.com (comma separated)"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    fontSize: 12.5,
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {showBccField && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 0 }}>
+                      BCC (Blind Carbon Copy)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setShowBccField(false); setReplyBcc(''); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', padding: 0 }}
+                    >
+                      ✕ Remove BCC
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={replyBcc}
+                    onChange={e => setReplyBcc(e.target.value)}
+                    placeholder="bcc@domain.com (comma separated)"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 6,
+                      padding: '8px 12px',
+                      fontSize: 12.5,
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Subject */}
               <div>
@@ -3401,11 +3503,21 @@ export const ContentStudioPage = () => {
                 </label>
                 <input
                   type="text"
-                  className="form-control"
                   value={replySubject}
                   onChange={e => setReplySubject(e.target.value)}
                   placeholder="Re: Subject"
-                  style={{ fontSize: 13, fontWeight: 600, padding: '8px 12px' }}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
                 />
               </div>
 
@@ -3455,67 +3567,31 @@ export const ContentStudioPage = () => {
                 )}
               </div>
 
-              {/* Quick Response Templates / AI Snippets */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Sparkles size={12} color="#2563eb" /> Quick Templates & Snippets
-                  </label>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Click to auto-populate response</span>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline"
-                    onClick={() => handleApplyReplyTemplate('MEETING')}
-                    style={{ fontSize: 11, borderRadius: 6 }}
-                  >
-                    📅 Propose 15-Min Call
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline"
-                    onClick={() => handleApplyReplyTemplate('PROPOSAL')}
-                    style={{ fontSize: 11, borderRadius: 6 }}
-                  >
-                    📄 Share Architecture Proposal
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline"
-                    onClick={() => handleApplyReplyTemplate('CONFIRM')}
-                    style={{ fontSize: 11, borderRadius: 6 }}
-                  >
-                    🙏 Confirm & Note Requirements
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-ghost"
-                    onClick={() => handleApplyReplyTemplate('CLEAR')}
-                    style={{ fontSize: 11, borderRadius: 6, color: 'var(--text-muted)' }}
-                  >
-                    🧹 Clear
-                  </button>
-                </div>
-              </div>
-
               {/* Message Body */}
-              <div>
+              <div style={{ width: '100%', boxSizing: 'border-box' }}>
                 <label className="form-label" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 4 }}>
                   Reply Message Body
                 </label>
                 <textarea
-                  className="form-control"
-                  rows={7}
+                  rows={8}
                   value={replyBody}
                   onChange={e => setReplyBody(e.target.value)}
                   placeholder="Type your message here..."
                   style={{
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    padding: '10px 12px',
-                    fontFamily: 'inherit',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    display: 'block',
+                    minHeight: 180,
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: 8,
+                    padding: '12px 14px',
+                    fontSize: 13.5,
+                    lineHeight: 1.6,
+                    color: 'var(--text-primary)',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    outline: 'none',
                   }}
                   autoFocus
                 />
