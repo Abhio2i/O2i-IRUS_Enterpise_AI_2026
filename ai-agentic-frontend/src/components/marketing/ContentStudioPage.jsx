@@ -467,6 +467,33 @@ export const ContentStudioPage = () => {
     }
   };
 
+  const formatContactGreeting = (senderName, senderEmail) => {
+    if (!senderName || senderName.trim().length === 0) {
+      if (senderEmail && senderEmail.includes('@')) {
+        const userPart = senderEmail.split('@')[0].replace(/[._-]/g, ' ');
+        return userPart.charAt(0).toUpperCase() + userPart.slice(1);
+      }
+      return 'there';
+    }
+    let name = senderName.trim();
+    if (name.includes(',')) {
+      const parts = name.split(',');
+      if (parts.length >= 2 && parts[1].trim().length > 0) {
+        name = parts[1].trim();
+      } else {
+        name = parts[0].trim();
+      }
+    }
+    const words = name.split(/\s+/);
+    if (words.length > 0 && words[0].length > 0) {
+      name = words[0];
+    }
+    if (name.length > 1 && name === name.toUpperCase()) {
+      name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+    }
+    return name;
+  };
+
   const handleToggleInlineReply = (reply) => {
     if (!reply) return;
     if (activeInlineReplyId === reply.id) {
@@ -480,8 +507,8 @@ export const ContentStudioPage = () => {
       setReplySubject(cleanSubj);
       setReplySenderFrom(fromEmail || defaultSender || 'ab2@o2i.tech');
       setReplyAttachments([]);
-      const contactName = reply.senderName || reply.senderEmail?.split('@')[0] || 'there';
-      setReplyBody(`Hi ${contactName},\n\nThank you for getting back to us.\n\nBest regards,\n${senderName || 'Oxygen to Innovation Team'}`);
+      const firstName = formatContactGreeting(reply.senderName, reply.senderEmail);
+      setReplyBody(`Hi ${firstName},\n\nThank you for getting back to us.\n\nBest regards,\n${senderName || 'Oxygen to Innovation Team'}`);
     }
   };
 
@@ -495,8 +522,8 @@ export const ContentStudioPage = () => {
     setReplyAttachments([]);
     setShowReplyThreadPreview(false);
 
-    const contactName = reply.senderName || reply.senderEmail?.split('@')[0] || 'there';
-    setReplyBody(`Hi ${contactName},\n\nThank you for getting back to us.\n\nBest regards,\n${senderName || 'Oxygen to Innovation Team'}`);
+    const firstName = formatContactGreeting(reply.senderName, reply.senderEmail);
+    setReplyBody(`Hi ${firstName},\n\nThank you for getting back to us.\n\nBest regards,\n${senderName || 'Oxygen to Innovation Team'}`);
 
     setSelectedReply(null);
     setReplyComposerOpen(true);
@@ -504,16 +531,16 @@ export const ContentStudioPage = () => {
 
   const handleApplyReplyTemplate = (templateType) => {
     if (!replyTarget) return;
-    const name = replyTarget.senderName || replyTarget.senderEmail?.split('@')[0] || 'there';
+    const firstName = formatContactGreeting(replyTarget.senderName, replyTarget.senderEmail);
     const company = replyTarget.schoolName || 'your organization';
     const myName = senderName || 'Oxygen to Innovation Team';
 
     if (templateType === 'MEETING') {
-      setReplyBody(`Hi ${name},\n\nThank you for reaching out! I would love to connect for a quick 15-minute alignment call regarding our agentic AI platform for ${company}.\n\nAre you available on Thursday or Friday afternoon? Alternatively, feel free to suggest a date and time that suits your schedule.\n\nLooking forward to speaking soon.\n\nBest regards,\n${myName}`);
+      setReplyBody(`Hi ${firstName},\n\nThank you for reaching out! I would love to connect for a quick 15-minute alignment call regarding our agentic AI platform for ${company}.\n\nAre you available on Thursday or Friday afternoon? Alternatively, feel free to suggest a date and time that suits your schedule.\n\nLooking forward to speaking soon.\n\nBest regards,\n${myName}`);
     } else if (templateType === 'PROPOSAL') {
-      setReplyBody(`Hi ${name},\n\nThank you for your interest! I have attached our detailed architecture roadmap and enterprise transformation overview for ${company}.\n\nPlease let me know if you would like us to clarify any specific technical milestones or compliance criteria.\n\nBest regards,\n${myName}`);
+      setReplyBody(`Hi ${firstName},\n\nThank you for your interest! I have attached our detailed architecture roadmap and enterprise transformation overview for ${company}.\n\nPlease let me know if you would like us to clarify any specific technical milestones or compliance criteria.\n\nBest regards,\n${myName}`);
     } else if (templateType === 'CONFIRM') {
-      setReplyBody(`Hi ${name},\n\nReceived and noted with thanks! We are preparing the requested information and will update you shortly.\n\nPlease don't hesitate to reach out if you have any immediate questions in the meantime.\n\nBest regards,\n${myName}`);
+      setReplyBody(`Hi ${firstName},\n\nReceived and noted with thanks! We are preparing the requested information and will update you shortly.\n\nPlease don't hesitate to reach out if you have any immediate questions in the meantime.\n\nBest regards,\n${myName}`);
     } else if (templateType === 'CLEAR') {
       setReplyBody('');
     }
@@ -2756,23 +2783,53 @@ export const ContentStudioPage = () => {
                   {activeInlineReplyId === reply.id && (
                     <div
                       style={{
-                        marginTop: 12,
-                        padding: 14,
-                        background: 'var(--bg-elevated)',
+                        marginTop: 14,
+                        padding: '16px 18px',
+                        background: 'var(--bg-card)',
                         borderRadius: 10,
-                        border: '1.5px solid #2563eb',
+                        border: '1px solid var(--border-default)',
+                        borderLeft: '4px solid #2563eb',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 12,
-                        boxShadow: '0 4px 14px rgba(37,99,235,0.08)',
+                        gap: 14,
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                        width: '100%',
+                        boxSizing: 'border-box',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Mail size={14} color="#2563eb" />
-                          <span>Replying directly to: <strong>{reply.senderEmail}</strong></span>
+                      {/* Header bar */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              background: 'rgba(37,99,235,0.08)',
+                              color: '#2563eb',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Mail size={13} /> Replying to:
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {reply.senderEmail}
+                          </span>
                           {reply.schoolName && (
-                            <span style={{ fontSize: 10.5, padding: '1px 7px', background: 'rgba(37,99,235,0.08)', color: '#2563eb', borderRadius: 4, fontWeight: 600 }}>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: '2px 8px',
+                                background: 'var(--bg-hover)',
+                                color: 'var(--text-secondary)',
+                                borderRadius: 6,
+                                border: '1px solid var(--border-subtle)',
+                                fontWeight: 500,
+                              }}
+                            >
                               🏢 {reply.schoolName}
                             </span>
                           )}
@@ -2781,48 +2838,67 @@ export const ContentStudioPage = () => {
                           type="button"
                           className="btn btn-xs btn-ghost"
                           onClick={() => setActiveInlineReplyId(null)}
-                          style={{ fontSize: 11, padding: '2px 8px' }}
+                          style={{ fontSize: 11.5, color: 'var(--text-muted)' }}
                         >
-                          ✕ Cancel
+                          ✕ Close
                         </button>
                       </div>
 
-                      {/* Sending Account & Subject */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: 10 }}>
-                        <div>
-                          <label style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>From Account</label>
+                      {/* From Account & Subject Row */}
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ flex: '0 0 240px', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>From Account</label>
                           <input
                             type="text"
-                            className="form-control"
                             value={replySenderFrom}
                             onChange={e => setReplySenderFrom(e.target.value)}
                             placeholder="ab2@o2i.tech"
-                            style={{ fontSize: 12, padding: '6px 10px' }}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              background: 'var(--bg-input)',
+                              border: '1px solid var(--border-default)',
+                              borderRadius: 6,
+                              padding: '8px 11px',
+                              fontSize: 12.5,
+                              color: 'var(--text-primary)',
+                              outline: 'none',
+                            }}
                           />
                         </div>
-                        <div>
-                          <label style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Subject</label>
+                        <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>Subject</label>
                           <input
                             type="text"
-                            className="form-control"
                             value={replySubject}
                             onChange={e => setReplySubject(e.target.value)}
                             placeholder="Re: Subject"
-                            style={{ fontSize: 12, fontWeight: 600, padding: '6px 10px' }}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              background: 'var(--bg-input)',
+                              border: '1px solid var(--border-default)',
+                              borderRadius: 6,
+                              padding: '8px 12px',
+                              fontSize: 12.5,
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                              outline: 'none',
+                            }}
                           />
                         </div>
                       </div>
 
                       {/* Quick 1-click templates */}
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, marginRight: 2 }}>
                           <Sparkles size={12} color="#2563eb" /> Quick:
                         </span>
                         <button
                           type="button"
                           className="btn btn-xs btn-outline"
                           onClick={() => handleApplyReplyTemplate('MEETING')}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5 }}
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 14, background: 'var(--bg-hover)' }}
                         >
                           📅 Propose 15-Min Call
                         </button>
@@ -2830,7 +2906,7 @@ export const ContentStudioPage = () => {
                           type="button"
                           className="btn btn-xs btn-outline"
                           onClick={() => handleApplyReplyTemplate('PROPOSAL')}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5 }}
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 14, background: 'var(--bg-hover)' }}
                         >
                           📄 Share Architecture Proposal
                         </button>
@@ -2838,7 +2914,7 @@ export const ContentStudioPage = () => {
                           type="button"
                           className="btn btn-xs btn-outline"
                           onClick={() => handleApplyReplyTemplate('CONFIRM')}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5 }}
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 14, background: 'var(--bg-hover)' }}
                         >
                           🙏 Confirm & Note
                         </button>
@@ -2846,49 +2922,57 @@ export const ContentStudioPage = () => {
                           type="button"
                           className="btn btn-xs btn-ghost"
                           onClick={() => handleApplyReplyTemplate('CLEAR')}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, color: 'var(--text-muted)' }}
+                          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 14, color: 'var(--text-muted)' }}
                         >
                           🧹 Clear
                         </button>
                       </div>
 
-                      {/* Reply Message Textarea */}
-                      <div>
+                      {/* Reply Message Textarea - FULL WIDTH */}
+                      <div style={{ width: '100%', boxSizing: 'border-box' }}>
                         <textarea
-                          className="form-control"
-                          rows={6}
+                          rows={7}
                           value={replyBody}
                           onChange={e => setReplyBody(e.target.value)}
                           placeholder="Type your reply message here..."
                           style={{
-                            fontSize: 13,
-                            lineHeight: 1.6,
-                            padding: '10px 12px',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            display: 'block',
+                            minHeight: 160,
+                            background: 'var(--bg-input)',
+                            border: '1px solid var(--border-default)',
                             borderRadius: 8,
+                            padding: '12px 14px',
+                            fontSize: 13.5,
+                            lineHeight: 1.6,
+                            color: 'var(--text-primary)',
                             fontFamily: 'inherit',
+                            resize: 'vertical',
+                            outline: 'none',
                           }}
                           autoFocus
                         />
                       </div>
 
                       {/* Attachments & Action Buttons */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, width: '100%', boxSizing: 'border-box', paddingTop: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <label
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 5,
-                              fontSize: 11,
+                              fontSize: 11.5,
                               fontWeight: 600,
                               cursor: 'pointer',
-                              padding: '5px 10px',
+                              padding: '6px 12px',
                               background: 'var(--bg-surface)',
                               borderRadius: 6,
                               border: '1px solid var(--border-default)',
                             }}
                           >
-                            <Paperclip size={12} /> Attach File
+                            <Paperclip size={13} /> Attach File
                             <input
                               type="file"
                               multiple
@@ -2901,18 +2985,19 @@ export const ContentStudioPage = () => {
                             />
                           </label>
                           {replyAttachments.length > 0 && (
-                            <span style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>
+                            <span style={{ fontSize: 11.5, color: '#2563eb', fontWeight: 600 }}>
                               📎 {replyAttachments.length} file(s) attached
                             </span>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <button
                             type="button"
-                            className="btn btn-xs btn-ghost"
+                            className="btn btn-sm btn-ghost"
                             onClick={() => setActiveInlineReplyId(null)}
                             disabled={isSendingReply}
+                            style={{ fontSize: 12.5 }}
                           >
                             Cancel
                           </button>
@@ -2928,16 +3013,18 @@ export const ContentStudioPage = () => {
                               alignItems: 'center',
                               gap: 6,
                               fontWeight: 600,
-                              padding: '6px 16px',
+                              padding: '7px 18px',
+                              borderRadius: 7,
+                              boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
                             }}
                           >
                             {isSendingReply ? (
                               <>
-                                <RefreshCw size={12} className="spin" /> Sending Reply via SMTP...
+                                <RefreshCw size={13} className="spin" /> Sending Reply via SMTP...
                               </>
                             ) : (
                               <>
-                                <Send size={12} /> Send Reply Now
+                                <Send size={13} /> Send Reply Now
                               </>
                             )}
                           </button>
