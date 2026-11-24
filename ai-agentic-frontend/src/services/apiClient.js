@@ -29,7 +29,7 @@ export const getBackendBase = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) {
     return import.meta.env.VITE_BACKEND_URL;
   }
-  return 'http://localhost:9095';
+  return 'http://127.0.0.1:9095';
 };
 
 export let BACKEND_URL = getBackendBase();
