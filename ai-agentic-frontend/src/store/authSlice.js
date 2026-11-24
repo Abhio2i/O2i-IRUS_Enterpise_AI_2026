@@ -19,6 +19,8 @@ const initialState = {
   error: null,
   isAuthModalOpen: false,
   authModalMode: 'login', // 'login' | 'register'
+  isSessionExpired: false,
+  sessionExpiryReason: '',
 };
 
 const authSlice = createSlice({
@@ -45,6 +47,8 @@ const authSlice = createSlice({
       state.user = null;
       state.status = 'idle';
       state.error = null;
+      state.isSessionExpired = false;
+      state.sessionExpiryReason = '';
       try {
         localStorage.removeItem('agentic_auth_user');
         // Tokens are cleared by apiClient.logout() via clearAuthTokens()
@@ -77,6 +81,14 @@ const authSlice = createSlice({
       state.error = action.payload;
       state.status = 'failed';
     },
+    triggerSessionExpired: (state, action) => {
+      state.isSessionExpired = true;
+      state.sessionExpiryReason = action.payload || 'Security token expired. Please refresh your session or sign in again.';
+    },
+    resolveSessionExpired: (state) => {
+      state.isSessionExpired = false;
+      state.sessionExpiryReason = '';
+    },
   },
 });
 
@@ -88,6 +100,8 @@ export const {
   closeAuthModal,
   setAuthStatus,
   setAuthError,
+  triggerSessionExpired,
+  resolveSessionExpired,
 } = authSlice.actions;
 
 export default authSlice.reducer;

@@ -81,6 +81,52 @@ export const clearAuthTokens = () => {
   } catch {}
 };
 
+// Global session expired callback & event dispatcher
+let sessionExpiredCallback = null;
+
+export const setSessionExpiredHandler = (callback) => {
+  sessionExpiredCallback = callback;
+};
+
+export const notifySessionExpired = (reason = 'Your security session has expired.') => {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('agentic:session-expired', { detail: { reason } }));
+    }
+    if (typeof sessionExpiredCallback === 'function') {
+      sessionExpiredCallback(reason);
+    }
+  } catch (err) {
+    console.warn('notifySessionExpired error:', err);
+  }
+};
+
+export function parseJwt(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+export function isTokenExpired(token) {
+  const payload = parseJwt(token);
+  if (!payload || !payload.exp) return false;
+  // Expired if current epoch is past expiration (with 10-second buffer)
+  return Date.now() >= (payload.exp * 1000 - 10000);
+}
+
 function getAuthHeaders(extra = {}) {
   const token = getAccessToken();
   const headers = { ...extra };
@@ -220,26 +266,35 @@ export async function login({
 export async function refreshAuth() {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
+    notifySessionExpired('No refresh token available. Please sign in again.');
     throw new Error('No refresh token available. Please sign in again.');
   }
 
-  const res = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
-  });
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
 
-  if (!res.ok) {
-    clearAuthTokens();
-    const errMsg = await parseErrorResponse(res, 'Session refresh failed');
-    throw new Error(errMsg);
+    if (!res.ok) {
+      clearAuthTokens();
+      notifySessionExpired('Session refresh token has expired or is invalid.');
+      const errMsg = await parseErrorResponse(res, 'Session refresh failed');
+      throw new Error(errMsg);
+    }
+
+    const data = await res.json();
+    setAuthTokens(data);
+    return data;
+  } catch (err) {
+    if (!err.message?.includes('No refresh token')) {
+      notifySessionExpired(err.message || 'Session expired.');
+    }
+    throw err;
   }
-
-  const data = await res.json();
-  setAuthTokens(data);
-  return data;
 }
 
 /**

@@ -1,12 +1,15 @@
 import { SentryConsolePage } from './components/security/SentryConsolePage';
-import React from 'react';
-import { useSelector } from 'react-redux';
+import React, { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { GovernanceDrawer } from './components/GovernanceDrawer';
 import { AgentRoadmapModal } from './components/common/AgentRoadmapModal';
 import { AuthModal } from './components/common/AuthModal';
+import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { LoginPage } from './components/auth/LoginPage';
+import { triggerSessionExpired } from './store/authSlice';
+import { getAccessToken, isTokenExpired, refreshAuth } from './services/apiClient';
 
 // Operations Pages
 import { ProjectsPage } from './components/operations/ProjectsPage';
@@ -120,8 +123,44 @@ const PageRouter = () => {
 };
 
 export const App = () => {
+  const dispatch = useDispatch();
   const theme = useSelector((s) => s.theme.mode);
   const isAuthenticated = useSelector((s) => s.auth.isAuthenticated);
+
+  // Monitor session validity and listen to session-expired events
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // 1. Listen for global session-expired events fired by apiClient
+    const handleSessionExpiredEvent = (e) => {
+      const reason = e?.detail?.reason || 'Your security session has expired.';
+      dispatch(triggerSessionExpired(reason));
+    };
+
+    window.addEventListener('agentic:session-expired', handleSessionExpiredEvent);
+
+    // 2. Periodic token validity check (runs every 30 seconds)
+    const checkInterval = setInterval(async () => {
+      const token = getAccessToken();
+      if (!token) return;
+
+      if (isTokenExpired(token)) {
+        console.warn('[SESSION WATCHER] Access token expired, attempting silent renewal...');
+        try {
+          await refreshAuth();
+          console.info('[SESSION WATCHER] Token renewed successfully.');
+        } catch (err) {
+          console.warn('[SESSION WATCHER] Silent token renewal failed:', err.message);
+          dispatch(triggerSessionExpired('Your session has expired. Please refresh to continue.'));
+        }
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('agentic:session-expired', handleSessionExpiredEvent);
+      clearInterval(checkInterval);
+    };
+  }, [isAuthenticated, dispatch]);
 
   if (!isAuthenticated) {
     return (
@@ -152,6 +191,7 @@ export const App = () => {
       <AgentRoadmapModal />
 
       <AuthModal />
+      <SessionExpiredModal />
     </div>
   );
 };
