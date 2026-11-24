@@ -37,6 +37,10 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(java.util.List.of(
+                "http://86.48.20.60:8080",
+                "http://86.48.20.60:8080/",
+                "http://86.48.20.60:*",
+                "https://86.48.20.60:*",
                 "http://localhost:3002",
                 "http://127.0.0.1:3002",
                 "http://147.93.108.99:3002",
