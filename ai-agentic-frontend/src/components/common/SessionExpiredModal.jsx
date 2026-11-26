@@ -138,7 +138,7 @@ export const SessionExpiredModal = () => {
           </div>
           <div style={{ flex: 1 }}>
             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#ffffff' }}>
-              Session Expired • सत्र समाप्त
+              Session Expired
             </h3>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
               Security timeout or authentication token ended
@@ -149,7 +149,7 @@ export const SessionExpiredModal = () => {
         {/* Modal Body */}
         <div style={{ padding: '1.5rem' }}>
           <p style={{ fontSize: '0.92rem', color: '#cbd5e1', lineHeight: 1.55, margin: '0 0 1rem' }}>
-            Aapka login session expire ho chuka hai. Agar aap apna kaam continue rakhna chahte hain toh <strong>Refresh Session</strong> par click karein, ya safe exit ke liye <strong>Log Out</strong> karein.
+            Your active login session has expired for security reasons. Click <strong>Refresh Session</strong> to resume your work without losing any progress, or select <strong>Log Out Now</strong> to exit securely.
           </p>
 
           {expiryReason && (
@@ -306,7 +306,7 @@ export const SessionExpiredModal = () => {
               }}
             >
               <RotateCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-              {isRefreshing ? 'Refreshing Session...' : 'Refresh Session (सत्र ताज़ा करें)'}
+              {isRefreshing ? 'Refreshing Session...' : 'Refresh Session'}
             </button>
           </div>
         </div>
