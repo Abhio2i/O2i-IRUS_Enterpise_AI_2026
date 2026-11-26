@@ -570,11 +570,11 @@ ${attachmentNotice}
           <div className="stat-desc">Total stated contract value</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Weighted Pipeline</div>
-          <div className="stat-value" style={{ fontSize: 18, color: '#22c55e' }}>
-            ${(weightedValue / 1000).toFixed(0)}K
+          <div className="stat-label">Active & Sent</div>
+          <div className="stat-value" style={{ fontSize: 22, color: '#22c55e' }}>
+            {proposals.filter(p => p.status === 'ACTIVE' || p.status === 'SENT').length}
           </div>
-          <div className="stat-desc">Win-probability adjusted</div>
+          <div className="stat-desc">Live in pipeline or sent</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Active Negotiations</div>
@@ -686,25 +686,6 @@ ${attachmentNotice}
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                           Valid until {prop.validUntil}
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Probability Bar */}
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Win Probability</span>
-                        <span style={{ fontWeight: 700, color: prop.probability > 75 ? '#22c55e' : prop.probability > 50 ? '#f59e0b' : '#6366f1' }}>
-                          {prop.probability}%
-                        </span>
-                      </div>
-                      <div style={{ height: 5, background: 'var(--bg-active)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{
-                          width: `${prop.probability}%`,
-                          height: '100%',
-                          borderRadius: 3,
-                          background: prop.probability > 75 ? '#22c55e' : prop.probability > 50 ? '#f59e0b' : '#6366f1',
-                          transition: 'width 0.4s ease'
-                        }} />
                       </div>
                     </div>
 
@@ -865,7 +846,7 @@ ${attachmentNotice}
                   ['Version', selectedProp.version],
                   ['Sent Date', selectedProp.sentDate || 'Not Sent Yet'],
                   ['Valid Until', selectedProp.validUntil],
-                  ['Win Probability', `${selectedProp.probability}%`],
+                  ['Duration', selectedProp.duration || 'N/A'],
                   ['Current Status', selectedProp.status.replace('_', ' ')],
                 ].map(([label, val]) => (
                   <div key={label} style={{ padding: '8px 10px', background: 'var(--bg-hover)', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
