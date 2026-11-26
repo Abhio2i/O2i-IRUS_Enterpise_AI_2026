@@ -474,6 +474,13 @@ public class MarketingProposalController {
                     probability
             );
 
+            if (endDate != null && !endDate.isBlank()) {
+                try {
+                    LocalDate parsedEnd = LocalDate.parse(endDate.trim().substring(0, Math.min(10, endDate.trim().length())));
+                    proposal.update(proposal.getContentJson(), proposal.getStatus(), proposal.getWinProbability(), "Submit before " + parsedEnd, parsedEnd);
+                } catch (Exception ignored) {}
+            }
+
             return view(proposals.save(proposal));
         } catch (ResponseStatusException e) {
             throw e;

@@ -122,7 +122,7 @@ export const ProposalsPage = () => {
           title: (p.content?.title) || `${p.clientCompany} AI Transformation Proposal`,
           version: 'v1.0',
           value: `$${Number(p.budget || 0).toLocaleString()}`,
-          validUntil: p.followUpDate || '2026-12-31',
+          validUntil: p.content?.endDate || p.followUpDate || '2026-12-31',
           status: p.status || 'DRAFT',
           sentDate: p.sentAt ? p.sentAt.split('T')[0] : null,
           products: p.services || [],
