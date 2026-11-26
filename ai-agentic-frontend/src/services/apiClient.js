@@ -1925,6 +1925,47 @@ export async function createProposal(payload) {
 }
 
 /**
+ * AI Extract Proposal Document (Auto-Fills Requirements, Dates, Tender ID, Budget)
+ * POST /api/marketing/proposals/extract-document
+ */
+export async function extractProposalDocument(file) {
+  if (!file) throw new Error('File is required for proposal extraction');
+  const formData = new FormData();
+  formData.append('file', file);
+
+  let headers = getAuthHeaders();
+  delete headers['Content-Type'];
+
+  let res = await fetch(`${BACKEND_URL}/api/marketing/proposals/extract-document`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        const freshHeaders = getAuthHeaders();
+        delete freshHeaders['Content-Type'];
+        res = await fetch(`${BACKEND_URL}/api/marketing/proposals/extract-document`, {
+          method: 'POST',
+          headers: freshHeaders,
+          body: formData,
+        });
+      }
+    } catch {}
+  }
+
+  if (!res.ok) {
+    const err = await parseErrorResponse(res, 'Failed to extract proposal document');
+    throw new Error(err);
+  }
+
+  return res.json();
+}
+
+/**
  * Upload Existing Proposal Document
  * POST /api/marketing/proposals/upload
  * Multipart form data: file, clientCompany, contactName, contactEmail, industry, useCase, budget, timeline, status, services
