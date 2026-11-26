@@ -351,6 +351,7 @@ public class MarketingProposalController {
             @RequestParam(value = "demonstrationDate", required = false) String demonstrationDate,
             @RequestParam(value = "duration", required = false) String duration,
             @RequestParam(value = "requirements", required = false) String requirements,
+            @RequestParam(value = "uploadedBy", required = false) String uploadedBy,
             @RequestParam(value = "clientCompany", required = false) String clientCompany,
             @RequestParam(value = "contactName", required = false) String contactName,
             @RequestParam(value = "contactEmail", required = false) String contactEmail,
@@ -443,6 +444,7 @@ public class MarketingProposalController {
             contentMap.put("demonstrationDate", demonstrationDate != null ? demonstrationDate.trim() : "");
             contentMap.put("duration", (duration != null && !duration.isBlank()) ? duration.trim() : resolvedTimeline);
             contentMap.put("requirements", (requirements != null && !requirements.isBlank()) ? requirements.trim() : resolvedUseCase);
+            contentMap.put("uploadedBy", (uploadedBy != null && !uploadedBy.isBlank()) ? uploadedBy.trim() : (auth.getToken().getClaimAsString("email") != null ? auth.getToken().getClaimAsString("email") : "Team Member"));
             contentMap.put("sourceType", "UPLOADED_DOCUMENT");
             contentMap.put("documentId", doc.getId().toString());
             contentMap.put("originalFilename", safeFilename);

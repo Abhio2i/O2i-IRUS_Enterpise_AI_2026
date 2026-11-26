@@ -43,6 +43,7 @@ const AVAILABLE_SERVICES = [
 export const ProposalsPage = () => {
   const dispatch = useDispatch();
   const reduxProposals = useSelector(s => s.marketing.proposals);
+  const authUser = useSelector(s => s.auth.user);
 
   const [proposals, setProposals] = useState([]);
   const [pipelineStats, setPipelineStats] = useState(null);
@@ -75,6 +76,7 @@ export const ProposalsPage = () => {
     price: '50000',
     duration: '3 Months',
     requirements: '',
+    uploadedBy: authUser?.displayName || authUser?.name || authUser?.email || '',
     contactName: '',
     contactEmail: '',
     industry: 'Logistics & Supply Chain',
@@ -135,6 +137,7 @@ export const ProposalsPage = () => {
           demonstrationDate: p.content?.demonstrationDate || '',
           duration: p.content?.duration || p.timeline || '',
           requirements: p.content?.requirements || p.useCase || '',
+          uploadedBy: p.content?.uploadedBy || '',
           content: p.content || {},
           raw: p
         }));
@@ -350,6 +353,7 @@ export const ProposalsPage = () => {
       data.append('demonstrationDate', uploadFormData.demonstrationDate.trim());
       data.append('duration', uploadFormData.duration.trim() || uploadFormData.timeline.trim());
       data.append('requirements', uploadFormData.requirements.trim() || uploadFormData.useCase.trim());
+      data.append('uploadedBy', uploadFormData.uploadedBy.trim() || authUser?.displayName || authUser?.email || 'Team Member');
       data.append('contactName', uploadFormData.contactName.trim() || 'Executive Decision Maker');
       data.append('contactEmail', uploadFormData.contactEmail.trim().toLowerCase());
       data.append('industry', uploadFormData.industry.trim());
@@ -645,6 +649,11 @@ ${attachmentNotice}
                               <Play size={10} /> Demo: {prop.demonstrationDate}
                             </span>
                           )}
+                          {prop.uploadedBy && (
+                            <span className="badge" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <User size={10} /> By: {prop.uploadedBy}
+                            </span>
+                          )}
                         </div>
                         <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>{prop.title}</h4>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
@@ -806,6 +815,12 @@ ${attachmentNotice}
                       <div>
                         <span style={{ color: 'var(--text-muted)' }}>Submission Deadline: </span>
                         <span style={{ color: '#ef4444', fontWeight: 600 }}>{selectedProp.endDate}</span>
+                      </div>
+                    )}
+                    {selectedProp.uploadedBy && (
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Uploaded By: </span>
+                        <strong style={{ color: '#06b6d4' }}>{selectedProp.uploadedBy}</strong>
                       </div>
                     )}
                   </div>
@@ -1565,17 +1580,33 @@ ${attachmentNotice}
                   />
                 </div>
 
-                {/* Row 8: Industry */}
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
-                    Industry / Vertical
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={uploadFormData.industry}
-                    onChange={e => setUploadFormData({ ...uploadFormData, industry: e.target.value })}
-                  />
+                {/* Row 8: Uploaded By & Industry */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                      <User size={12} color="#22c55e" /> Uploaded By (Your Name) *
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. Hemant Kumar"
+                      value={uploadFormData.uploadedBy}
+                      onChange={e => setUploadFormData({ ...uploadFormData, uploadedBy: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Industry / Vertical
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={uploadFormData.industry}
+                      onChange={e => setUploadFormData({ ...uploadFormData, industry: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 {/* Row 9: Services / Products Covered */}
