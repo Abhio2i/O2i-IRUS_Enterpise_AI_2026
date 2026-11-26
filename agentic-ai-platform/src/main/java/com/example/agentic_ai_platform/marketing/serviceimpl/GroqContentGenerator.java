@@ -36,7 +36,7 @@ public class GroqContentGenerator {
         try {
             ObjectNode body = objectMapper.createObjectNode();
             body.put("model", model);
-            body.put("temperature", 0.4);
+            body.put("temperature", 0.1);
             body.putObject("response_format").put("type", "json_object");
             ArrayNode messages = body.putArray("messages");
             messages.addObject().put("role", "system").put("content", systemPrompt);
@@ -59,6 +59,14 @@ public class GroqContentGenerator {
             if (content.isBlank()) {
                 log.warn("Groq returned blank structured content; finish_reason={}", choice.path("finish_reason").asText("unknown"));
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Groq returned an empty proposal. Please retry.");
+            }
+            // Strip reasoning blocks or markdown code fences if present
+            content = content.replaceAll("(?s)<think>.*?</think>", "").trim();
+            content = content.replaceAll("(?s)^```(?:json)?\\s*", "").replaceAll("(?s)\\s*```$", "").trim();
+            int firstBrace = content.indexOf('{');
+            int lastBrace = content.lastIndexOf('}');
+            if (firstBrace >= 0 && lastBrace > firstBrace) {
+                content = content.substring(firstBrace, lastBrace + 1);
             }
             JsonNode parsed = objectMapper.readTree(content);
             if (!parsed.isObject() || parsed.isEmpty()) {

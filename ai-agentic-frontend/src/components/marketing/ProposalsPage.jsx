@@ -286,24 +286,28 @@ export const ProposalsPage = () => {
       const extracted = await extractProposalDocument(file);
       setExtractedMeta(extracted);
 
+      const cleanPrice = extracted.price != null
+        ? String(extracted.price).replace(/[^0-9.]/g, '')
+        : '';
+
       setUploadFormData(prev => ({
         ...prev,
-        name: extracted.name || prev.name || file.name.replace(/\.[^/.]+$/, ''),
-        clientCompany: extracted.clientCompany || prev.clientCompany || file.name.replace(/\.[^/.]+$/, ''),
-        tenderId: extracted.tenderId || prev.tenderId || '',
-        startDate: extracted.startDate || prev.startDate || '',
-        endDate: extracted.endDate || prev.endDate || '',
-        projectStartDate: extracted.projectStartDate || prev.projectStartDate || '',
-        demonstrationDate: extracted.demonstrationDate || prev.demonstrationDate || '',
-        price: extracted.price != null ? String(extracted.price) : (prev.price || '50000'),
-        budget: extracted.price != null ? String(extracted.price) : (prev.budget || '50000'),
-        duration: extracted.duration || prev.duration || '3 Months',
-        timeline: extracted.duration || prev.timeline || '3 Months',
-        requirements: extracted.requirements || prev.requirements || '',
-        useCase: extracted.requirements || prev.useCase || 'Enterprise solution delivery',
-        industry: extracted.industry || prev.industry || 'Logistics & Supply Chain',
-        contactName: extracted.contactName || prev.contactName || 'Executive Decision Maker',
-        contactEmail: extracted.contactEmail || prev.contactEmail || '',
+        name: extracted.name || file.name.replace(/\.[^/.]+$/, ''),
+        clientCompany: extracted.clientCompany || file.name.replace(/\.[^/.]+$/, ''),
+        tenderId: extracted.tenderId || '',
+        startDate: extracted.startDate || '',
+        endDate: extracted.endDate || '',
+        projectStartDate: extracted.projectStartDate || '',
+        demonstrationDate: extracted.demonstrationDate || '',
+        price: cleanPrice || '50000',
+        budget: cleanPrice || '50000',
+        duration: extracted.duration || '3 Months',
+        timeline: extracted.duration || '3 Months',
+        requirements: extracted.requirements || '',
+        useCase: extracted.requirements || 'Enterprise solution delivery',
+        industry: extracted.industry || 'Technology & Enterprise Solutions',
+        contactName: extracted.contactName || 'Executive Decision Maker',
+        contactEmail: extracted.contactEmail || '',
         services: Array.isArray(extracted.services) && extracted.services.length > 0
           ? extracted.services
           : prev.services,

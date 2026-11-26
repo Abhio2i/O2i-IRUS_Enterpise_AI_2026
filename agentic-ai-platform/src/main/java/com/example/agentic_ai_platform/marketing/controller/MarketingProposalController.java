@@ -234,6 +234,7 @@ public class MarketingProposalController {
             String rawFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "document";
             String safeFilename = rawFilename.replaceAll("[\\\\/]", "_");
 
+            tika.setMaxStringLength(500_000);
             String extractedText = "";
             try {
                 extractedText = tika.parseToString(new ByteArrayInputStream(bytes));
@@ -243,58 +244,89 @@ public class MarketingProposalController {
             }
 
             extractedText = extractedText.replaceAll("\\u0000", "").trim();
+            log.info("Proposal document {} parsed via Tika: {} characters extracted", safeFilename, extractedText.length());
 
             Map<String, Object> result = new LinkedHashMap<>();
             boolean aiSucceeded = false;
 
             if (!extractedText.isBlank()) {
-                String textSnippet = extractedText.length() > 12000
-                        ? extractedText.substring(0, 12000)
-                        : extractedText;
+                // Capture both the beginning (cover, tender notice, dates) and end (pricing, schedule, annexures)
+                String textSnippet;
+                if (extractedText.length() > 24000) {
+                    textSnippet = extractedText.substring(0, 14000)
+                            + "\n\n... [MIDDLE CONTENT OMITTED] ...\n\n"
+                            + extractedText.substring(extractedText.length() - 10000);
+                } else {
+                    textSnippet = extractedText;
+                }
 
                 String systemPrompt = """
-                        You are an Enterprise RFP, Tender, and Proposal Document Analysis AI.
-                        Analyze the provided document text and extract all required procurement metadata into strict JSON format without markdown wrapping.
+                        You are a precision Enterprise Tender, RFP, and Proposal Document Extraction Engine.
+                        Your job is to read the ENTIRE document text carefully and extract the EXACT values present in the document.
+                        Do NOT invent fake values when actual values exist in the text.
 
-                        Required JSON Schema:
+                        Return ONLY a valid JSON object (no markdown, no comments) with these exact keys:
                         {
-                          "name": "Project Name or Tender Title (e.g. Cloud Modernization & AI Exception System)",
-                          "clientCompany": "Client Organization, Department, Authority, or Enterprise Name",
-                          "tenderId": "Tender ID, RFP Reference Number, or Bid Notice Number (e.g. GEM/2026/B/8912 or RFP-2026-001). If none is found, create an intelligent reference code like TND-2026-XXXX",
-                          "startDate": "Tender release or proposal start date in YYYY-MM-DD or readable format (or empty string if not found)",
-                          "endDate": "Proposal submission deadline or closing date in YYYY-MM-DD or readable format",
-                          "projectStartDate": "Expected project commencement or start date in YYYY-MM-DD or readable format",
-                          "demonstrationDate": "Demo date, technical presentation date, or pre-bid meeting date in YYYY-MM-DD or readable format",
-                          "price": 50000.00, // Estimated budget, total value, or contract price as numeric value
-                          "duration": "Duration of project (e.g. 6 Months, 12 Months, 180 Days)",
-                          "industry": "Industry or vertical (e.g. Logistics & Supply Chain, IT & Software, Government, Defence)",
-                          "requirements": "Summary of requirements, scope of work, technical specifications, and key deliverables",
-                          "services": ["List of relevant services/modules needed"],
-                          "contactName": "Contact person, Nodal Officer, or signatory name",
-                          "contactEmail": "Contact email address",
+                          "name": "Exact Project Name, Work Title, Subject, or Tender Title from the document",
+                          "clientCompany": "Exact Client Organization, Ministry, Department, or Procuring Entity Name",
+                          "tenderId": "Exact Tender ID, NIT No., RFP Ref No., GeM Bid No., or Enquiry No. found in document",
+                          "startDate": "Bid Publishing / Document Issue / Submission Start Date from document (YYYY-MM-DD or exact date string)",
+                          "endDate": "Bid Submission End Date / Closing Date / Due Date from document (YYYY-MM-DD or exact date string)",
+                          "projectStartDate": "Expected Project Start / Commencement / Kickoff Date from document (YYYY-MM-DD or exact date string)",
+                          "demonstrationDate": "Technical Presentation / Demo / POC / Pre-Bid Meeting Date from document (YYYY-MM-DD or exact date string)",
+                          "price": 50000.00,
+                          "duration": "Exact Project Duration or Completion Period from document (e.g. 6 Months, 12 Months, 180 Days)",
+                          "industry": "Industry or vertical (e.g. Logistics & Supply Chain, IT & Software, Government, Healthcare)",
+                          "requirements": "Comprehensive summary of actual Scope of Work, Technical Requirements, Eligibility, and Deliverables from the document",
+                          "services": ["Relevant services or modules mentioned in the document"],
+                          "contactName": "Exact Contact Person, Nodal Officer, or Tender Inviting Authority name from document",
+                          "contactEmail": "Exact Contact Email ID from document",
                           "confidenceScore": 96,
-                          "executiveSummary": "Concise 2-3 sentence overview of this proposal/tender"
+                          "executiveSummary": "Concise 2-3 sentence summary of the proposal/tender"
                         }
-                        Never return empty JSON.
+
+                        Rules:
+                        - For "price", return a plain JSON number (no currency symbols or commas). If Lakhs/Crores or INR/USD is mentioned, convert to the numeric value.
+                        - Normalize dates to YYYY-MM-DD wherever possible; otherwise keep the exact date string from the document.
+                        - If a specific date (like demonstrationDate or projectStartDate) is not explicitly mentioned in the document, leave it as "" instead of guessing.
+                        - Always return valid JSON.
                         """;
 
                 try {
                     var structured = groq.generateStructuredJson(systemPrompt,
-                            "Filename: " + safeFilename + "\n\nDocument Text Content:\n" + textSnippet);
+                            "Filename: " + safeFilename + "\n\nExtracted Document Text:\n" + textSnippet);
                     if (structured != null && !structured.isEmpty()) {
                         result = json.readValue(json.writeValueAsString(structured),
                                 json.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
                         aiSucceeded = true;
+                        log.info("Groq AI extracted proposal metadata successfully for {}", safeFilename);
                     }
                 } catch (Exception e) {
                     log.warn("Groq structured extraction failed for proposal file {}: {}", safeFilename, e.getMessage());
                 }
             }
 
-            if (!aiSucceeded || result.isEmpty() || result.get("name") == null) {
+            if (!aiSucceeded || result.isEmpty()) {
                 result = heuristicFallbackExtraction(safeFilename, extractedText);
+            } else {
+                // Ensure essential fallbacks if AI left company/email blank
+                String company = result.get("clientCompany") != null ? String.valueOf(result.get("clientCompany")).trim() : "";
+                if (company.isBlank() || "null".equalsIgnoreCase(company)) {
+                    company = extractCompanyNameFromFilename(safeFilename);
+                    result.put("clientCompany", company);
+                }
+                String name = result.get("name") != null ? String.valueOf(result.get("name")).trim() : "";
+                if (name.isBlank() || "null".equalsIgnoreCase(name)) {
+                    result.put("name", company + " Proposal");
+                }
+                String email = result.get("contactEmail") != null ? String.valueOf(result.get("contactEmail")).trim() : "";
+                if (email.isBlank() || "null".equalsIgnoreCase(email) || !email.contains("@")) {
+                    result.put("contactEmail", extractEmailOrFallback(extractedText, company));
+                }
             }
 
+            result.put("extractionSource", aiSucceeded ? "GROQ_AI" : "HEURISTIC_FALLBACK");
+            result.put("extractedTextLength", extractedText.length());
             result.put("originalFilename", safeFilename);
             result.put("fileSizeBytes", file.getSize());
 
