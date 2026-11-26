@@ -161,6 +161,13 @@ public class MarketingProposalController {
         return view(owned(id, tenant(auth)));
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id, JwtAuthenticationToken auth) {
+        var p = owned(id, tenant(auth));
+        proposals.delete(p);
+    }
+
     @PostMapping("/generate")
     public Map<String, Object> generate(@Valid @RequestBody ProposalInput in) {
         String prompt = "Create a client-ready enterprise business proposal as JSON with keys: " +

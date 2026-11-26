@@ -11,13 +11,14 @@ import {
   getProposalPipeline,
   uploadProposalDocument,
   downloadProposalDocument,
-  extractProposalDocument
+  extractProposalDocument,
+  deleteProposal
 } from '../../services/apiClient';
 import {
   FileText, Send, CheckCircle, Clock, AlertTriangle, TrendingUp, DollarSign,
   Edit3, XCircle, Sparkles, Plus, Loader2, Printer, Eye, Building2, User,
   Mail, Calendar, Briefcase, Layers, ArrowRight, ShieldCheck, Check,
-  UploadCloud, Paperclip, Download, Hash, Play, Tag, Zap, CheckCircle2
+  UploadCloud, Paperclip, Download, Hash, Play, Tag, Zap, CheckCircle2, Trash2
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -263,6 +264,19 @@ export const ProposalsPage = () => {
       setTimeout(() => setSuccessToast(''), 3000);
     } catch (err) {
       alert(`Download failed: ${err.message}`);
+    }
+  };
+
+  const handleDeleteProposal = async (prop) => {
+    if (!window.confirm(`Are you sure you want to delete "${prop.title}"?`)) return;
+    try {
+      await deleteProposal(prop.id);
+      setProposals(prev => prev.filter(p => p.id !== prop.id));
+      if (selected === prop.id) setSelected(null);
+      setSuccessToast(`Deleted proposal "${prop.title}"`);
+      setTimeout(() => setSuccessToast(''), 3500);
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
     }
   };
 
@@ -736,6 +750,14 @@ ${attachmentNotice}
                             </button>
                           </>
                         )}
+                        <button
+                          className="btn btn-xs btn-ghost"
+                          title="Delete Proposal"
+                          onClick={e => { e.stopPropagation(); handleDeleteProposal(prop); }}
+                          style={{ color: '#ef4444' }}
+                        >
+                          <Trash2 size={11} /> Delete
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -755,6 +777,9 @@ ${attachmentNotice}
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="btn btn-ghost btn-xs" onClick={handlePrint} title="Print / Download PDF">
                   <Printer size={13} />
+                </button>
+                <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteProposal(selectedProp)} title="Delete Proposal" style={{ color: '#ef4444' }}>
+                  <Trash2 size={13} />
                 </button>
                 <button className="btn btn-ghost btn-xs" onClick={() => setSelected(null)}>✕</button>
               </div>

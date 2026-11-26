@@ -2007,6 +2007,36 @@ export async function uploadProposalDocument(formData) {
  * Download Proposal Original Document File
  * GET /api/marketing/proposals/:id/document
  */
+export async function deleteProposal(proposalId) {
+  if (!proposalId) throw new Error('proposalId is required');
+  let headers = getAuthHeaders();
+
+  let res = await fetch(`${BACKEND_URL}/api/marketing/proposals/${encodeURIComponent(proposalId)}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (res.status === 401 && getRefreshToken()) {
+    try {
+      const refreshed = await refreshAuth();
+      if (refreshed?.accessToken) {
+        headers = getAuthHeaders();
+        res = await fetch(`${BACKEND_URL}/api/marketing/proposals/${encodeURIComponent(proposalId)}`, {
+          method: 'DELETE',
+          headers,
+        });
+      }
+    } catch {}
+  }
+
+  if (!res.ok && res.status !== 204) {
+    const err = await parseErrorResponse(res, 'Failed to delete proposal');
+    throw new Error(err);
+  }
+
+  return true;
+}
+
 export async function downloadProposalDocument(proposalId, fallbackFilename = 'proposal-document.pdf') {
   if (!proposalId) throw new Error('proposalId is required');
   let headers = getAuthHeaders();
