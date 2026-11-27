@@ -64,7 +64,8 @@ export const SentryConsolePage = () => {
   const [cameraFilter, setCameraFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [incidentPage, setIncidentPage] = useState(1);
-  const [incidentsPerPage, setIncidentsPerPage] = useState(12);
+  const [incidentsPerPage, setIncidentsPerPage] = useState(20);
+  const [serverPagination, setServerPagination] = useState(null);
   const [iframeKey, setIframeKey] = useState(0);
 
   useEffect(() => {
@@ -166,12 +167,19 @@ export const SentryConsolePage = () => {
     }
   }, [activeTab, rawCameraFilter, rawDateFilter]);
 
-  // Fetch Stats & Incidents directly from Sentry (CORS enabled)
-  const fetchData = async () => {
+  // Fetch Stats & Incidents directly from Sentry (CORS enabled, server-side pagination ready)
+  const fetchData = async (pageArg = incidentPage, perPageArg = incidentsPerPage) => {
     try {
+      const params = new URLSearchParams();
+      params.set('page', String(pageArg));
+      params.set('per_page', perPageArg === 'ALL' ? '1000' : String(perPageArg));
+      if (incidentFilter && incidentFilter !== 'all') params.set('reason', incidentFilter);
+      if (cameraFilter && cameraFilter !== 'all') params.set('camera', cameraFilter);
+      if (searchQuery && searchQuery.trim()) params.set('q', searchQuery.trim());
+
       const [statsRes, incRes] = await Promise.all([
         fetch(`${SENTRY_BASE}/api/stats`),
-        fetch(`${SENTRY_BASE}/api/incidents`),
+        fetch(`${SENTRY_BASE}/api/incidents?${params.toString()}`),
       ]);
 
       if (statsRes && statsRes.ok) {
@@ -181,11 +189,23 @@ export const SentryConsolePage = () => {
 
       if (incRes && incRes.ok) {
         const incData = await incRes.json();
-        const list = Array.isArray(incData)
-          ? incData
-          : incData.incidents ?? incData.data ?? incData.clips ?? [];
-        setIncidents(list);
-        console.log('[SENTRY] incidents loaded:', list.length, list[0]);
+        if (Array.isArray(incData)) {
+          setServerPagination(null);
+          setIncidents(incData);
+        } else {
+          const list = incData.incidents ?? incData.data ?? incData.clips ?? [];
+          if (typeof incData.total === 'number') {
+            setServerPagination({
+              total: incData.total,
+              page: incData.page || pageArg,
+              per_page: incData.per_page || (perPageArg === 'ALL' ? incData.total : perPageArg),
+              total_pages: incData.total_pages || Math.max(1, Math.ceil(incData.total / (perPageArg === 'ALL' ? incData.total || 1 : perPageArg))),
+            });
+          } else {
+            setServerPagination(null);
+          }
+          setIncidents(list);
+        }
       } else {
         console.warn('[SENTRY] incidents fetch failed:', incRes && incRes.status);
       }
@@ -197,10 +217,10 @@ export const SentryConsolePage = () => {
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 8000);
+    fetchData(incidentPage, incidentsPerPage);
+    const interval = setInterval(() => fetchData(incidentPage, incidentsPerPage), 8000);
     return () => clearInterval(interval);
-  }, []);
+  }, [incidentPage, incidentsPerPage, incidentFilter, cameraFilter, searchQuery]);
 
   // Poll live camera frames every 1.5s
   useEffect(() => {
@@ -374,7 +394,7 @@ export const SentryConsolePage = () => {
                 color: activeTab === 'incidents' ? '#fff' : 'var(--text-muted)',
               }}
             >
-              <Film size={14} /> Recorded Clips & Incidents ({filteredIncidents.length})
+              <Film size={14} /> Recorded Clips & Incidents ({serverPagination ? serverPagination.total : filteredIncidents.length})
             </button>
 
             <button
@@ -718,9 +738,11 @@ export const SentryConsolePage = () => {
                   gap: 16,
                 }}
               >
-                {(incidentsPerPage === 'ALL'
+                {(serverPagination
                   ? filteredIncidents
-                  : filteredIncidents.slice((incidentPage - 1) * incidentsPerPage, incidentPage * incidentsPerPage)
+                  : (incidentsPerPage === 'ALL'
+                      ? filteredIncidents
+                      : filteredIncidents.slice((incidentPage - 1) * incidentsPerPage, incidentPage * incidentsPerPage))
                 ).map((inc) => {
                 const reasonCfg = getReasonConfig(inc.reason);
                 const targets = inc.detected_targets || [];
@@ -924,9 +946,9 @@ export const SentryConsolePage = () => {
 
               {/* Pagination Bar */}
               {(() => {
-                const total = filteredIncidents.length;
+                const total = serverPagination ? serverPagination.total : filteredIncidents.length;
                 const perPage = incidentsPerPage === 'ALL' ? total : incidentsPerPage;
-                const totalPages = perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1;
+                const totalPages = serverPagination ? serverPagination.total_pages : (perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1);
                 const startIdx = total === 0 ? 0 : (incidentPage - 1) * perPage + 1;
                 const endIdx = incidentsPerPage === 'ALL' ? total : Math.min(total, incidentPage * perPage);
 
@@ -1023,9 +1045,9 @@ export const SentryConsolePage = () => {
                           fontWeight: 600,
                         }}
                       >
-                        <option value={12}>12 / page</option>
-                        <option value={24}>24 / page</option>
-                        <option value={48}>48 / page</option>
+                        <option value={20}>20 / page</option>
+                        <option value={40}>40 / page</option>
+                        <option value={60}>60 / page</option>
                         <option value="ALL">Show All ({total})</option>
                       </select>
                     </div>
