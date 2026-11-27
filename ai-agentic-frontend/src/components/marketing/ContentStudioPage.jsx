@@ -369,10 +369,10 @@ export const ContentStudioPage = () => {
         setSavedLists(data);
         if (data.length > 0) {
           setSelectedListId(prev => {
-            if (prev && data.some(l => l.id === prev)) {
+            if (prev && data.some(l => String(l.id) === String(prev))) {
               return prev;
             }
-            const firstId = data[0].id;
+            const firstId = String(data[0].id);
             if (audienceTypeRef.current === 'LIST') {
               fetchListContacts(firstId);
             }
@@ -701,19 +701,21 @@ export const ContentStudioPage = () => {
   useEffect(() => {
     const preselectedListId = localStorage.getItem('selectedCampaignListId');
     const preselectedListName = localStorage.getItem('selectedCampaignListName');
+    const preselectedDirectContactRaw = localStorage.getItem('selectedDirectContact');
+
     if (preselectedListId) {
       setActiveTab('Sender');
       changeAudienceType('LIST');
-      setSelectedListId(preselectedListId);
+      setSelectedListId(String(preselectedListId));
       fetchListContacts(preselectedListId);
       if (preselectedListName) {
         setCampaignName(`${preselectedListName} Outreach Campaign`);
       }
       localStorage.removeItem('selectedCampaignListId');
       localStorage.removeItem('selectedCampaignListName');
+      return;
     }
 
-    const preselectedDirectContactRaw = localStorage.getItem('selectedDirectContact');
     if (preselectedDirectContactRaw) {
       try {
         const contact = JSON.parse(preselectedDirectContactRaw);
@@ -726,6 +728,7 @@ export const ContentStudioPage = () => {
         setCampaignName(`Direct Outreach - ${contact.company || contact.email}`);
       } catch {}
       localStorage.removeItem('selectedDirectContact');
+      return;
     }
 
     const proposalCampaignRaw = localStorage.getItem('selectedProposalCampaign') || localStorage.getItem('activeSelectedProposal');
@@ -737,6 +740,7 @@ export const ContentStudioPage = () => {
         console.warn('Proposal sync parse warning:', e.message);
       }
       localStorage.removeItem('selectedProposalCampaign');
+      localStorage.removeItem('activeSelectedProposal');
     }
   }, []);
 

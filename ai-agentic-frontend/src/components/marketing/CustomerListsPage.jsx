@@ -238,8 +238,11 @@ export const CustomerListsPage = () => {
 
   const handleLaunchCampaign = (list) => {
     if (!list) return;
-    localStorage.setItem('selectedCampaignListId', list.id);
-    localStorage.setItem('selectedCampaignListName', list.name);
+    localStorage.removeItem('selectedDirectContact');
+    localStorage.removeItem('selectedProposalCampaign');
+    localStorage.removeItem('activeSelectedProposal');
+    localStorage.setItem('selectedCampaignListId', String(list.id));
+    localStorage.setItem('selectedCampaignListName', list.name || '');
     dispatch(setActiveRoute('marketing.studio'));
   };
 
@@ -382,6 +385,10 @@ export const CustomerListsPage = () => {
   // ── Compose Email to Single Contact ──────────────────────────────────────
   const handleSendEmailToContact = (contact) => {
     if (!contact?.email) return;
+    localStorage.removeItem('selectedCampaignListId');
+    localStorage.removeItem('selectedCampaignListName');
+    localStorage.removeItem('selectedProposalCampaign');
+    localStorage.removeItem('activeSelectedProposal');
     localStorage.setItem('selectedDirectContact', JSON.stringify({
       email: contact.email,
       firstName: contact.firstName || '',
