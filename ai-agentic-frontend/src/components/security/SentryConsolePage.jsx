@@ -73,6 +73,7 @@ export const SentryConsolePage = () => {
   const [rawLoading, setRawLoading] = useState(false);
   const [rawAuthError, setRawAuthError] = useState(false);
   const [togglingCamId, setTogglingCamId] = useState(null);
+  const [rawViewMode, setRawViewMode] = useState('full24h'); // 'full24h' | 'all'
 
   const fetchRawRecordings = async (cam = rawCameraFilter, dt = rawDateFilter) => {
     setRawLoading(true);
@@ -1251,131 +1252,210 @@ export const SentryConsolePage = () => {
               </button>
             )}
 
+            <div
+              style={{
+                display: 'inline-flex',
+                background: 'var(--bg-surface)',
+                padding: 3,
+                borderRadius: 8,
+                border: '1px solid var(--border-default)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setRawViewMode('full24h')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: rawViewMode === 'full24h' ? '#06b6d4' : 'transparent',
+                  color: rawViewMode === 'full24h' ? '#fff' : 'var(--text-muted)',
+                }}
+              >
+                24h Full Videos Only
+              </button>
+              <button
+                type="button"
+                onClick={() => setRawViewMode('all')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: rawViewMode === 'all' ? '#06b6d4' : 'transparent',
+                  color: rawViewMode === 'all' ? '#fff' : 'var(--text-muted)',
+                }}
+              >
+                Live Segments
+              </button>
+            </div>
+
             <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-              {rawRecordings.length} video(s) found
+              {(() => {
+                const visible = rawRecordings.filter((r) => {
+                  const fn = r.filename || r.name || '';
+                  const is24 = fn.includes('full24h') || r.is_full_24h || r.type === 'full24h';
+                  const hasSize = r.size_mb === undefined || Number(r.size_mb) > 0;
+                  return hasSize && (rawViewMode === 'all' || is24);
+                });
+                return `${visible.length} video(s) shown`;
+              })()}
             </span>
           </div>
 
           {/* Recordings Grid */}
-          {rawLoading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)' }}>
-              Loading 24h continuous raw recordings from {SENTRY_BASE}...
-            </div>
-          ) : rawRecordings.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)' }}>
-              No raw recordings found for the selected camera or date. Enable 24h recording above for active cameras.
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: 16,
-              }}
-            >
-              {rawRecordings.map((rec, idx) => {
-                const camName = rec.camera || rec.camera_name || 'Camera';
-                const filename = rec.filename || rec.name || '';
-                const videoUrl = `${SENTRY_BASE}/recordings/${encodeURIComponent(camName)}/${encodeURIComponent(filename)}`;
-                const isFull24h = filename.includes('full24h') || rec.is_full_24h || rec.type === 'full24h';
-                const sizeMb = rec.size_mb ?? (rec.size_bytes ? (rec.size_bytes / (1024 * 1024)).toFixed(1) : null);
+          {(() => {
+            const visibleRecordings = rawRecordings.filter((r) => {
+              const fn = r.filename || r.name || '';
+              const is24 = fn.includes('full24h') || r.is_full_24h || r.type === 'full24h';
+              const hasSize = r.size_mb === undefined || Number(r.size_mb) > 0;
+              return hasSize && (rawViewMode === 'all' || is24);
+            });
 
-                return (
-                  <div
-                    key={`${camName}-${filename}-${idx}`}
-                    style={{
-                      background: 'var(--bg-elevated)',
-                      border: `1px solid ${isFull24h ? 'rgba(6, 182, 212, 0.45)' : 'var(--border-default)'}`,
-                      borderRadius: 12,
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    <div style={{ position: 'relative', background: '#000', aspectRatio: '16/9' }}>
-                      <video
-                        controls
-                        preload="metadata"
-                        src={videoUrl}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      />
-                      {isFull24h && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: 10,
-                            left: 10,
-                            padding: '4px 9px',
-                            borderRadius: 6,
-                            background: 'rgba(6, 182, 212, 0.9)',
-                            color: '#fff',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            pointerEvents: 'none',
-                          }}
-                        >
-                          24h Full Video
-                        </span>
-                      )}
-                    </div>
+            if (rawLoading) {
+              return (
+                <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)' }}>
+                  Loading 24h continuous raw recordings from {SENTRY_BASE}...
+                </div>
+              );
+            }
 
-                    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>
-                          {camName}
-                        </span>
-                        {sizeMb && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                            {sizeMb} MB
+            if (visibleRecordings.length === 0) {
+              return (
+                <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)', lineHeight: 1.6 }}>
+                  {rawViewMode === 'full24h' ? (
+                    <>
+                      <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+                        No merged 24h full video available yet for this selection
+                      </div>
+                      <div style={{ fontSize: 12.5 }}>
+                        Active cameras with <strong>REC ON</strong> are currently recording. Tonight at <strong>12:15 AM</strong>, today&apos;s segments will automatically merge into <strong>1 single continuous video</strong> (<code>YYYYMMDD_full24h.mp4</code>) and appear here.
+                      </div>
+                    </>
+                  ) : (
+                    'No playable raw recordings found for the selected camera or date.'
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                  gap: 16,
+                }}
+              >
+                {visibleRecordings.map((rec, idx) => {
+                  const camName = rec.camera || rec.camera_name || 'Camera';
+                  const filename = rec.filename || rec.name || '';
+                  const videoUrl = `${SENTRY_BASE}/recordings/${encodeURIComponent(camName)}/${encodeURIComponent(filename)}`;
+                  const isFull24h = filename.includes('full24h') || rec.is_full_24h || rec.type === 'full24h';
+                  const sizeMb = rec.size_mb ?? (rec.size_bytes ? (rec.size_bytes / (1024 * 1024)).toFixed(1) : null);
+
+                  return (
+                    <div
+                      key={`${camName}-${filename}-${idx}`}
+                      style={{
+                        background: 'var(--bg-elevated)',
+                        border: `1px solid ${isFull24h ? 'rgba(6, 182, 212, 0.45)' : 'var(--border-default)'}`,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      <div style={{ position: 'relative', background: '#000', aspectRatio: '16/9' }}>
+                        <video
+                          controls
+                          preload="metadata"
+                          src={videoUrl}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        />
+                        {isFull24h && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: 10,
+                              left: 10,
+                              padding: '4px 9px',
+                              borderRadius: 6,
+                              background: 'rgba(6, 182, 212, 0.9)',
+                              color: '#fff',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            24h Full Video
                           </span>
                         )}
                       </div>
 
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
-                        {filename} {(rec.date || rec.timestamp) ? `· ${rec.date || new Date(rec.timestamp).toLocaleString()}` : ''}
-                      </div>
+                      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>
+                            {camName}
+                          </span>
+                          {sizeMb !== null && Number(sizeMb) > 0 && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                              {sizeMb} MB
+                            </span>
+                          )}
+                        </div>
 
-                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        <button
-                          type="button"
-                          onClick={() => setActiveVideoModal({
-                            camera_name: camName,
-                            reason: isFull24h ? '24h Full Continuous Raw Recording' : 'Raw Recording Segment',
-                            video_url: videoUrl,
-                            timestamp: rec.date || filename,
-                          })}
-                          style={{
-                            flex: 1,
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            padding: '7px 10px', borderRadius: 6, border: 'none',
-                            background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
-                            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                          }}
-                        >
-                          <Maximize2 size={13} /> Theater Mode
-                        </button>
-                        <a
-                          href={videoUrl}
-                          download={filename}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            padding: '7px 12px', borderRadius: 6,
-                            border: '1px solid var(--border-default)',
-                            background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                            fontSize: 12, fontWeight: 600, textDecoration: 'none',
-                          }}
-                        >
-                          <Download size={13} /> Download
-                        </a>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                          {filename} {(rec.date || rec.timestamp) ? `· ${rec.date || new Date(rec.timestamp).toLocaleString()}` : ''}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setActiveVideoModal({
+                              camera_name: camName,
+                              reason: isFull24h ? '24h Full Continuous Raw Recording' : 'Raw Recording Segment',
+                              video_url: videoUrl,
+                              timestamp: rec.date || filename,
+                            })}
+                            style={{
+                              flex: 1,
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              padding: '7px 10px', borderRadius: 6, border: 'none',
+                              background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            <Maximize2 size={13} /> Theater Mode
+                          </button>
+                          <a
+                            href={videoUrl}
+                            download={filename}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              padding: '7px 12px', borderRadius: 6,
+                              border: '1px solid var(--border-default)',
+                              background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                              fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                            }}
+                          >
+                            <Download size={13} /> Download
+                          </a>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
