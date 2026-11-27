@@ -65,6 +65,90 @@ export const SentryConsolePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [iframeKey, setIframeKey] = useState(0);
 
+  // Raw Video 24 (Continuous 24h Recordings) State
+  const [rawRecordings, setRawRecordings] = useState([]);
+  const [recordingSettings, setRecordingSettings] = useState({});
+  const [rawCameraFilter, setRawCameraFilter] = useState('all');
+  const [rawDateFilter, setRawDateFilter] = useState('');
+  const [rawLoading, setRawLoading] = useState(false);
+  const [rawAuthError, setRawAuthError] = useState(false);
+  const [togglingCamId, setTogglingCamId] = useState(null);
+
+  const fetchRawRecordings = async (cam = rawCameraFilter, dt = rawDateFilter) => {
+    setRawLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (cam && cam !== 'all') params.set('camera', cam);
+      if (dt) params.set('date', dt);
+
+      const res = await fetch(`${SENTRY_BASE}/api/recordings?${params.toString()}`);
+      if (res.status === 401 || res.status === 403) {
+        setRawAuthError(true);
+        setRawRecordings([]);
+        return;
+      }
+      if (res.ok) {
+        setRawAuthError(false);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.recordings ?? data.files ?? data.data ?? []);
+        setRawRecordings(list);
+      }
+    } catch (err) {
+      console.warn('Could not fetch Raw 24h recordings:', err);
+    } finally {
+      setRawLoading(false);
+    }
+  };
+
+  const fetchRecordingSettings = async () => {
+    try {
+      const res = await fetch(`${SENTRY_BASE}/api/recording_settings`);
+      if (res.status === 401 || res.status === 403) {
+        setRawAuthError(true);
+        return;
+      }
+      if (res.ok) {
+        setRawAuthError(false);
+        const data = await res.json();
+        setRecordingSettings(data.settings || data || {});
+      }
+    } catch (err) {
+      console.warn('Could not fetch recording settings:', err);
+    }
+  };
+
+  const handleToggleCameraRecording = async (camId, nextEnabled) => {
+    setTogglingCamId(camId);
+    try {
+      const res = await fetch(`${SENTRY_BASE}/api/recording_settings/${encodeURIComponent(camId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        setRawAuthError(true);
+        return;
+      }
+      if (res.ok) {
+        setRecordingSettings((prev) => ({
+          ...prev,
+          [camId]: typeof prev[camId] === 'object' ? { ...prev[camId], enabled: nextEnabled } : nextEnabled,
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to toggle 24h recording:', err);
+    } finally {
+      setTogglingCamId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'raw24') {
+      fetchRawRecordings(rawCameraFilter, rawDateFilter);
+      fetchRecordingSettings();
+    }
+  }, [activeTab, rawCameraFilter, rawDateFilter]);
+
   // Fetch Stats & Incidents directly from Sentry (CORS enabled)
   const fetchData = async () => {
     try {
@@ -293,6 +377,25 @@ export const SentryConsolePage = () => {
               }}
             >
               <LayoutGrid size={14} /> Live CCTV Grid
+            </button>
+
+            <button
+              onClick={() => setActiveTab('raw24')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 6,
+                fontSize: 12.5,
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                background: activeTab === 'raw24' ? '#ef4444' : 'transparent',
+                color: activeTab === 'raw24' ? '#fff' : 'var(--text-muted)',
+              }}
+            >
+              <Clock size={14} /> Raw Video 24
             </button>
 
             <button
@@ -971,6 +1074,298 @@ export const SentryConsolePage = () => {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* TAB 2B: RAW VIDEO 24 (24H CONTINUOUS RECORDINGS) */}
+      {activeTab === 'raw24' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 24h Recording ON/OFF Controls per Camera */}
+          <div
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Clock size={16} color="#06b6d4" />
+                <span style={{ fontWeight: 700, fontSize: 14 }}>24h Continuous Raw Recording Controls</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  (Daily auto-merged into YYYYMMDD_full24h.mp4 · 15-day retention)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { fetchRawRecordings(); fetchRecordingSettings(); }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-default)',
+                  background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={13} className={rawLoading ? 'spin' : ''} /> Refresh
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(stats.cameras || []).map((cam) => {
+                const setting = recordingSettings[cam.id] ?? recordingSettings[cam.name];
+                const isEnabled = typeof setting === 'object' ? Boolean(setting?.enabled) : Boolean(setting);
+                const isBusy = togglingCamId === cam.id;
+                return (
+                  <button
+                    key={cam.id}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleToggleCameraRecording(cam.id, !isEnabled)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '7px 12px',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: isBusy ? 'wait' : 'pointer',
+                      border: `1px solid ${isEnabled ? 'rgba(34, 197, 94, 0.4)' : 'var(--border-default)'}`,
+                      background: isEnabled ? 'rgba(34, 197, 94, 0.12)' : 'var(--bg-surface)',
+                      color: isEnabled ? '#22c55e' : 'var(--text-muted)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: isEnabled ? '#22c55e' : '#64748b',
+                      }}
+                    />
+                    <span>{cam.name}</span>
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: isEnabled ? 'rgba(34, 197, 94, 0.2)' : 'rgba(100, 116, 139, 0.2)' }}>
+                      {isBusy ? '...' : (isEnabled ? 'REC ON' : 'OFF')}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 401 Auth Notice if Sentry /api/recordings still has @login_required */}
+          {rawAuthError && (
+            <div
+              style={{
+                padding: '14px 16px',
+                borderRadius: 10,
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: '#f59e0b',
+                fontSize: 12.5,
+                lineHeight: 1.5,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={15} /> Sentry Recordings API Returned 401 (Login Required)
+              </div>
+              <div>
+                On your VPS, <code>/api/recordings</code> and <code>/api/recording_settings</code> in <code>~/sentry/dashboard/app.py</code> still require Sentry login. Remove <code>@login_required</code> from those routes and run <code>sudo systemctl restart sentry</code> so the Agentic AI dashboard can stream 24h raw videos directly.
+              </div>
+            </div>
+          )}
+
+          {/* Filter Bar */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+              background: 'var(--bg-elevated)',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid var(--border-default)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+              <Filter size={14} /> Filter Recordings:
+            </div>
+
+            <select
+              value={rawCameraFilter}
+              onChange={(e) => setRawCameraFilter(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--border-default)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                fontSize: 12.5,
+              }}
+            >
+              <option value="all">All Cameras</option>
+              {(stats.cameras || []).map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={rawDateFilter}
+              onChange={(e) => setRawDateFilter(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--border-default)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                fontSize: 12.5,
+              }}
+            />
+
+            {rawDateFilter && (
+              <button
+                type="button"
+                onClick={() => setRawDateFilter('')}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-default)',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear Date
+              </button>
+            )}
+
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+              {rawRecordings.length} video(s) found
+            </span>
+          </div>
+
+          {/* Recordings Grid */}
+          {rawLoading ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)' }}>
+              Loading 24h continuous raw recordings from {SENTRY_BASE}...
+            </div>
+          ) : rawRecordings.length === 0 ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 12, border: '1px solid var(--border-default)' }}>
+              No raw recordings found for the selected camera or date. Enable 24h recording above for active cameras.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: 16,
+              }}
+            >
+              {rawRecordings.map((rec, idx) => {
+                const camName = rec.camera || rec.camera_name || 'Camera';
+                const filename = rec.filename || rec.name || '';
+                const videoUrl = `${SENTRY_BASE}/recordings/${encodeURIComponent(camName)}/${encodeURIComponent(filename)}`;
+                const isFull24h = filename.includes('full24h') || rec.is_full_24h || rec.type === 'full24h';
+                const sizeMb = rec.size_mb ?? (rec.size_bytes ? (rec.size_bytes / (1024 * 1024)).toFixed(1) : null);
+
+                return (
+                  <div
+                    key={`${camName}-${filename}-${idx}`}
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      border: `1px solid ${isFull24h ? 'rgba(6, 182, 212, 0.45)' : 'var(--border-default)'}`,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    <div style={{ position: 'relative', background: '#000', aspectRatio: '16/9' }}>
+                      <video
+                        controls
+                        preload="metadata"
+                        src={videoUrl}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                      {isFull24h && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 10,
+                            left: 10,
+                            padding: '4px 9px',
+                            borderRadius: 6,
+                            background: 'rgba(6, 182, 212, 0.9)',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          24h Full Video
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>
+                          {camName}
+                        </span>
+                        {sizeMb && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                            {sizeMb} MB
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                        {filename} {rec.date ? `· ${rec.date}` : ''}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveVideoModal({
+                            camera_name: camName,
+                            reason: isFull24h ? '24h Full Continuous Raw Recording' : 'Raw Recording Segment',
+                            video_url: videoUrl,
+                            timestamp: rec.date || filename,
+                          })}
+                          style={{
+                            flex: 1,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            padding: '7px 10px', borderRadius: 6, border: 'none',
+                            background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          <Maximize2 size={13} /> Theater Mode
+                        </button>
+                        <a
+                          href={videoUrl}
+                          download={filename}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            padding: '7px 12px', borderRadius: 6,
+                            border: '1px solid var(--border-default)',
+                            background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                            fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                          }}
+                        >
+                          <Download size={13} /> Download
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
