@@ -31,7 +31,7 @@ import {
   Download,
 } from 'lucide-react';
 
-const SENTRY_BASE = 'http://147.93.108.99:9090';
+const SENTRY_BASE = 'http://86.48.20.60:9090';
 
 export const SentryConsolePage = () => {
   const [activeTab, setActiveTab] = useState('incidents'); // default to incidents or cameras
@@ -230,7 +230,7 @@ export const SentryConsolePage = () => {
                     boxShadow: '0 0 8px #22c55e',
                   }}
                 />
-                SYSTEM ACTIVE · 147.93.108.99:9090
+                SYSTEM ACTIVE · 86.48.20.60:9090
               </span>
             </div>
             <p
