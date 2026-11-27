@@ -63,7 +63,13 @@ export const SentryConsolePage = () => {
   const [incidentFilter, setIncidentFilter] = useState('all');
   const [cameraFilter, setCameraFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [incidentPage, setIncidentPage] = useState(1);
+  const [incidentsPerPage, setIncidentsPerPage] = useState(12);
   const [iframeKey, setIframeKey] = useState(0);
+
+  useEffect(() => {
+    setIncidentPage(1);
+  }, [incidentFilter, cameraFilter, searchQuery, incidentsPerPage]);
 
   // Raw Video 24 (Continuous 24h Recordings) State
   const [rawRecordings, setRawRecordings] = useState([]);
@@ -704,14 +710,18 @@ export const SentryConsolePage = () => {
               </div>
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-                gap: 16,
-              }}
-            >
-              {filteredIncidents.slice(0, 30).map((inc) => {
+            <>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                  gap: 16,
+                }}
+              >
+                {(incidentsPerPage === 'ALL'
+                  ? filteredIncidents
+                  : filteredIncidents.slice((incidentPage - 1) * incidentsPerPage, incidentPage * incidentsPerPage)
+                ).map((inc) => {
                 const reasonCfg = getReasonConfig(inc.reason);
                 const targets = inc.detected_targets || [];
                 const clipUrl = getClipUrl(inc.clip_path);
@@ -910,7 +920,119 @@ export const SentryConsolePage = () => {
                   </div>
                 );
               })}
-            </div>
+              </div>
+
+              {/* Pagination Bar */}
+              {(() => {
+                const total = filteredIncidents.length;
+                const perPage = incidentsPerPage === 'ALL' ? total : incidentsPerPage;
+                const totalPages = perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1;
+                const startIdx = total === 0 ? 0 : (incidentPage - 1) * perPage + 1;
+                const endIdx = incidentsPerPage === 'ALL' ? total : Math.min(total, incidentPage * perPage);
+
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 12,
+                      marginTop: 18,
+                      padding: '12px 16px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontWeight: 600 }}>
+                      Showing <strong style={{ color: 'var(--text-primary)' }}>{startIdx}–{endIdx}</strong> of <strong style={{ color: 'var(--text-primary)' }}>{total}</strong> clips
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        disabled={incidentPage <= 1 || incidentsPerPage === 'ALL'}
+                        onClick={() => setIncidentPage((p) => Math.max(1, p - 1))}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 6,
+                          border: '1px solid var(--border-default)',
+                          background: 'var(--bg-surface)',
+                          color: incidentPage <= 1 || incidentsPerPage === 'ALL' ? 'var(--text-muted)' : 'var(--text-primary)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: incidentPage <= 1 || incidentsPerPage === 'ALL' ? 'not-allowed' : 'pointer',
+                          opacity: incidentPage <= 1 || incidentsPerPage === 'ALL' ? 0.5 : 1,
+                        }}
+                      >
+                        Prev
+                      </button>
+
+                      {incidentsPerPage !== 'ALL' && Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setIncidentPage(pageNum)}
+                          style={{
+                            minWidth: 32,
+                            padding: '6px 10px',
+                            borderRadius: 6,
+                            border: pageNum === incidentPage ? '1px solid #ef4444' : '1px solid var(--border-default)',
+                            background: pageNum === incidentPage ? '#ef4444' : 'var(--bg-surface)',
+                            color: pageNum === incidentPage ? '#fff' : 'var(--text-primary)',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+
+                      <button
+                        type="button"
+                        disabled={incidentPage >= totalPages || incidentsPerPage === 'ALL'}
+                        onClick={() => setIncidentPage((p) => Math.min(totalPages, p + 1))}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 6,
+                          border: '1px solid var(--border-default)',
+                          background: 'var(--bg-surface)',
+                          color: incidentPage >= totalPages || incidentsPerPage === 'ALL' ? 'var(--text-muted)' : 'var(--text-primary)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: incidentPage >= totalPages || incidentsPerPage === 'ALL' ? 'not-allowed' : 'pointer',
+                          opacity: incidentPage >= totalPages || incidentsPerPage === 'ALL' ? 0.5 : 1,
+                        }}
+                      >
+                        Next
+                      </button>
+
+                      <select
+                        value={incidentsPerPage}
+                        onChange={(e) => setIncidentsPerPage(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                        style={{
+                          marginLeft: 6,
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid var(--border-default)',
+                          background: 'var(--bg-surface)',
+                          color: 'var(--text-primary)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <option value={12}>12 / page</option>
+                        <option value={24}>24 / page</option>
+                        <option value={48}>48 / page</option>
+                        <option value="ALL">Show All ({total})</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
       )}
