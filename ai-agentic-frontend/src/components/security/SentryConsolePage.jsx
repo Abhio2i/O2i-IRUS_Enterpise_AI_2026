@@ -110,7 +110,17 @@ export const SentryConsolePage = () => {
       if (res.ok) {
         setRawAuthError(false);
         const data = await res.json();
-        setRecordingSettings(data.settings || data || {});
+        if (Array.isArray(data)) {
+          const map = {};
+          data.forEach((item) => {
+            const val = Boolean(item.recording ?? item.enabled);
+            if (item.id) map[item.id] = val;
+            if (item.name) map[item.name] = val;
+          });
+          setRecordingSettings(map);
+        } else {
+          setRecordingSettings(data.settings || data || {});
+        }
       }
     } catch (err) {
       console.warn('Could not fetch recording settings:', err);
@@ -123,7 +133,7 @@ export const SentryConsolePage = () => {
       const res = await fetch(`${SENTRY_BASE}/api/recording_settings/${encodeURIComponent(camId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: nextEnabled }),
+        body: JSON.stringify({ enabled: nextEnabled, recording: nextEnabled }),
       });
       if (res.status === 401 || res.status === 403) {
         setRawAuthError(true);
@@ -132,7 +142,7 @@ export const SentryConsolePage = () => {
       if (res.ok) {
         setRecordingSettings((prev) => ({
           ...prev,
-          [camId]: typeof prev[camId] === 'object' ? { ...prev[camId], enabled: nextEnabled } : nextEnabled,
+          [camId]: nextEnabled,
         }));
       }
     } catch (err) {
@@ -1322,7 +1332,7 @@ export const SentryConsolePage = () => {
                       </div>
 
                       <div style={{ fontSize: 11.5, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
-                        {filename} {rec.date ? `· ${rec.date}` : ''}
+                        {filename} {(rec.date || rec.timestamp) ? `· ${rec.date || new Date(rec.timestamp).toLocaleString()}` : ''}
                       </div>
 
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
